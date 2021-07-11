@@ -1,11 +1,15 @@
 import Card from "react-bootstrap/Card";
 import Modal from "react-bootstrap/Modal";
 import Form from "react-bootstrap/Form";
+import Col from "react-bootstrap/Col";
 import React, { Component } from "react";
 import DeleteIcon from "@material-ui/icons/Delete";
 import EmailIcon from "@material-ui/icons/Email";
 import ChatIcon from "@material-ui/icons/Chat";
 import SendIcon from "@material-ui/icons/Send";
+import Alert from "@material-ui/lab/Alert";
+import DeleteForeverIcon from "@material-ui/icons/DeleteForever";
+import AlertTitle from "@material-ui/lab/AlertTitle";
 import CheckCircleSharpIcon from "@material-ui/icons/CheckCircleSharp";
 import ErrorOutlineSharpIcon from "@material-ui/icons/ErrorOutlineSharp";
 import Button from "@material-ui/core/Button";
@@ -19,6 +23,8 @@ import {
 import { blue, green } from "@material-ui/core/colors";
 import { AES, enc } from "crypto-js";
 import axios from "axios";
+import lodash from "lodash";
+import ChatModal from "../../components/chat.js";
 import Cookies from "universal-cookie";
 
 const cookies = new Cookies();
@@ -82,7 +88,15 @@ function EmailModal(props) {
       centered
     >
       <Modal.Header closeButton>
-        {props.loadingicon === "true" ? <CircularProgress /> : undefined}
+        {props.loadingicon === "true" ? (
+          <CircularProgress />
+        ) : (
+          <Alert severity="info" style={{ width: "100%" }}>
+            <AlertTitle>Info</AlertTitle>
+            An e-mail will be sent to our client —{" "}
+            <strong>{props.username}</strong>
+          </Alert>
+        )}
       </Modal.Header>
       <Modal.Body>
         <Form>
@@ -127,30 +141,6 @@ function EmailModal(props) {
           </ThemeProvider>
         </Form>
       </Modal.Body>
-      <Modal.Footer>
-        <Button onClick={props.onHide}>Close</Button>
-      </Modal.Footer>
-    </Modal>
-  );
-}
-
-function ChatModal(props) {
-  return (
-    <Modal
-      {...props}
-      size="lg"
-      aria-labelledby="contained-modal-title-vcenter"
-      centered
-    >
-      <Modal.Header closeButton>
-        <Modal.Title id="contained-modal-title-vcenter">
-          Chat Window
-        </Modal.Title>
-      </Modal.Header>
-      <Modal.Body>Some Chat with {props.user}</Modal.Body>
-      <Modal.Footer>
-        <Button onClick={props.onHide}>Close</Button>
-      </Modal.Footer>
     </Modal>
   );
 }
@@ -158,22 +148,48 @@ function ChatModal(props) {
 function DeleteModal(props) {
   return (
     <Modal
-      {...props}
+      show={props.show}
+      onHide={props.onHide}
       size="lg"
       aria-labelledby="contained-modal-title-vcenter"
       centered
     >
       <Modal.Header closeButton>
-        <Modal.Title id="contained-modal-title-vcenter">
-          Delete Window
-        </Modal.Title>
+        <Alert severity="warning" style={{ width: "100%" }}>
+          <AlertTitle>Warning</AlertTitle>
+          You are attempting to delete our client -{" "}
+          <strong> {props.username} </strong>. Please go back if not necessary.
+        </Alert>
       </Modal.Header>
       <Modal.Body>
-        Delete Client has been Attempted for {props.user} !!
+        <Form>
+          <Form.Row className="align-items-center">
+            <Col sm={3} className="warning-message">
+              Are you sure on this?
+            </Col>
+            <Col sm={3} className="checkbox">
+              <Form.Check
+                type="checkbox"
+                label="Check here to proceed"
+                name="isChecked"
+                onChange={props.onChange}
+              />
+            </Col>
+            <Col className="delete-user-btn">
+              {console.log(props.isChecked)}
+              <Button
+                variant="contained"
+                style={deleteBtnStyle}
+                startIcon={<DeleteForeverIcon />}
+                disabled={!props.isChecked}
+                // onClick={props.onSubmit} -- TODO --
+              >
+                Delete {props.username}
+              </Button>
+            </Col>
+          </Form.Row>
+        </Form>
       </Modal.Body>
-      <Modal.Footer>
-        <Button onClick={props.onHide}>Close</Button>
-      </Modal.Footer>
     </Modal>
   );
 }
@@ -187,6 +203,7 @@ class TableList extends Component {
       DeleteModalShow: false,
       EmailModalShow: false,
       user_of_activated_modal: "",
+      username_of_activated_modal: "",
       ChatModalShow: false,
       clients: [],
       users_component: [],
@@ -197,6 +214,7 @@ class TableList extends Component {
       loading: "false",
       response_status: "",
       response_message: "",
+      isChecked: false,
     };
     this.DecryptKey = this.DecryptKey.bind(this);
     this.GetHeaders = this.GetHeaders.bind(this);
@@ -210,14 +228,21 @@ class TableList extends Component {
   }
 
   onChange(event) {
-    this.setState({ [event.target.name]: event.target.value });
+    if (event.target.name === "isChecked") {
+      console.log(event.target.name, event.target.checked);
+      this.setState({ [event.target.name]: event.target.checked });
+    } else {
+      this.setState({ [event.target.name]: event.target.value });
+    }
   }
 
   getEncryptedValue(key, ENCRYPTION_KEY) {
-    var encrypted = AES.encrypt(JSON.stringify(key), ENCRYPTION_KEY).toString();
-    // Converting into base64 string
-    var wordArray = enc.Utf8.parse(String(encrypted));
-    encrypted = enc.Base64.stringify(wordArray).toString();
+    var encrypted = "";
+    if (lodash.isObject(key)) {
+      encrypted = AES.encrypt(JSON.stringify(key), ENCRYPTION_KEY).toString();
+    } else {
+      encrypted = AES.encrypt(String(key), ENCRYPTION_KEY).toString();
+    }
     return encrypted;
   }
 
@@ -225,16 +250,18 @@ class TableList extends Component {
     payload = this.getEncryptedValue(payload, "#");
     return payload;
   };
+
   DecryptKey(key) {
-    var wordArray = enc.Base64.parse(key);
-    var utf8String = enc.Utf8.stringify(wordArray);
-    utf8String = utf8String.replace(/ /g, "+");
-    var decryptedKey = AES.decrypt(String(utf8String), "#").toString(enc.Utf8);
-    if (decryptedKey[0] === '"' && decryptedKey.slice(-1) === '"') {
-      decryptedKey = decryptedKey.replace(/['"]+/g, "");
+    var wordArray = AES.decrypt(key, "#");
+    var utf8String = wordArray.toString(enc.Utf8);
+    try {
+      var obj = JSON.parse(utf8String);
+      return obj;
+    } catch (exc) {
+      return utf8String;
     }
-    return decryptedKey;
   }
+
   GetHeaders() {
     const token = cookies.get("x-access-token");
     if (!token) {
@@ -294,7 +321,6 @@ class TableList extends Component {
     event.preventDefault();
     this.setState({ loading: "true" });
     const { user_of_activated_modal, email_body, email_subject } = this.state;
-    console.log(email_subject, email_body);
     var payload = {
       email: user_of_activated_modal,
       subject: this.getEncryptedValue(email_subject, "#"),
@@ -360,6 +386,7 @@ class TableList extends Component {
                   onClick={() => {
                     this.setState({ DeleteModalShow: true });
                     this.setState({ user_of_activated_modal: data.email });
+                    this.setState({ username_of_activated_modal: data.name });
                   }}
                 >
                   Delete
@@ -375,6 +402,7 @@ class TableList extends Component {
                   onClick={() => {
                     this.setState({ EmailModalShow: true });
                     this.setState({ user_of_activated_modal: data.email });
+                    this.setState({ username_of_activated_modal: data.name });
                   }}
                 >
                   Email
@@ -390,6 +418,7 @@ class TableList extends Component {
                   onClick={() => {
                     this.setState({ ChatModalShow: true });
                     this.setState({ user_of_activated_modal: data.email });
+                    this.setState({ username_of_activated_modal: data.name });
                   }}
                 >
                   Chat
@@ -420,17 +449,27 @@ class TableList extends Component {
           body={this.state.email_body}
           onChange={this.onChange}
           user={this.state.user_of_activated_modal}
+          username={this.state.username_of_activated_modal}
           show={this.state.EmailModalShow}
           onHide={() => this.setState({ EmailModalShow: false })}
         />
         <ChatModal
           user={this.state.user_of_activated_modal}
+          username={this.state.username_of_activated_modal}
+          logged_in_user={this.state.logged_in_user}
           show={this.state.ChatModalShow}
+          get_headers={this.GetHeaders}
+          get_encrypted_value={this.getEncryptedValue}
+          get_encrypted_payload={this.getEncryptedPayload}
+          get_decrypted_key={this.DecryptKey}
           onHide={() => this.setState({ ChatModalShow: false })}
         />
         <DeleteModal
           user={this.state.user_of_activated_modal}
+          username={this.state.username_of_activated_modal}
           show={this.state.DeleteModalShow}
+          onChange={this.onChange}
+          isChecked={this.state.isChecked}
           onHide={() => this.setState({ DeleteModalShow: false })}
         />
         {this.state.ShowNotifications ? (
