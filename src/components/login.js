@@ -3,10 +3,13 @@ import ErrorOutlineSharpIcon from "@material-ui/icons/ErrorOutlineSharp";
 import Snackbar from "../components/Snackbar/Snackbar.js";
 import React, { Component } from "react";
 import "./index.css";
-import { AES, enc } from "crypto-js";
+import { AES } from "crypto-js";
 import axios from "axios";
 import Cookies from "universal-cookie";
+import lodash from "lodash";
 const cookies = new Cookies();
+
+const STATUS_LIST_TO_SHOW_REASON = [400, 422];
 
 class Login extends Component {
   constructor(props) {
@@ -18,7 +21,7 @@ class Login extends Component {
       userAuthorized: false,
       ShowNotifications: false,
       response_message: "",
-      response_status: "",
+      response_status: "danger",
       login_component: null,
     };
     this.OnLoginHit = this.OnLoginHit.bind(this);
@@ -31,10 +34,12 @@ class Login extends Component {
   }
 
   getEncryptedValue(key, ENCRYPTION_KEY) {
-    var encrypted = AES.encrypt(JSON.stringify(key), ENCRYPTION_KEY).toString();
-    // Converting into base64 string
-    var wordArray = enc.Utf8.parse(String(encrypted));
-    encrypted = enc.Base64.stringify(wordArray).toString();
+    var encrypted = "";
+    if (lodash.isObject(key)) {
+      encrypted = AES.encrypt(JSON.stringify(key), ENCRYPTION_KEY).toString();
+    } else {
+      encrypted = AES.encrypt(String(key), ENCRYPTION_KEY).toString();
+    }
     return encrypted;
   }
 
@@ -70,7 +75,12 @@ class Login extends Component {
       });
     } else {
       this.setState({ response_status: "danger" });
-      this.setState({ response_message: result.data.reasons[0] });
+      if (lodash.includes(STATUS_LIST_TO_SHOW_REASON, result.data.statusCode)) {
+        this.setState({ response_message: result.data.reasons[0] });
+      } else {
+        var status = result.data.status.split("_").join(" ");
+        this.setState({ response_message: status });
+      }
     }
   }
 
