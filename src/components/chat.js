@@ -8,7 +8,6 @@ import EmojiEmotionsIcon from "@material-ui/icons/EmojiEmotions";
 import IconButton from "@material-ui/core/IconButton";
 import Button from "@material-ui/core/Button";
 import PhotoCamera from "@material-ui/icons/PhotoCamera";
-import CachedIcon from "@material-ui/icons/Cached";
 import { ThemeProvider, createMuiTheme } from "@material-ui/core/styles";
 import { cyan } from "@material-ui/core/colors";
 import axios from "axios";
@@ -21,7 +20,20 @@ const ButtonTheme = createMuiTheme({
   },
 });
 
+const ChatContainerStyle = {
+  height: "450px",
+  overflowX: "hidden",
+  overflowY: "auto",
+  backgroundRepeat: `repeat`,
+  backgroundImage: `url("https://i.pinimg.com/originals/4a/96/e6/4a96e602750b8ef669a77565becf3939.gif")`,
+  backgroundBlendMode: "lighten",
+};
+
 class ChatModal extends Component {
+  _isMounted = false;
+  _init_rendering = false; // This is to ensure that the loadChat has been
+  // called once per page refresh to load the chat once in beginning
+
   constructor(props) {
     super(props);
     this.state = {
@@ -81,6 +93,9 @@ class ChatModal extends Component {
   getPrevChatDataCallOptions() {
     var receiver = this.encryptKeyStable(this.props.user);
     var sender = this.encryptKeyStable(this.props.logged_in_user);
+    if (receiver === "" || sender === "") {
+      return {};
+    }
     const finalURL = `http://localhost:3001/chat/receivers/${receiver}/senders/${sender}`;
     var callOptions = {
       method: "GET",
@@ -91,73 +106,72 @@ class ChatModal extends Component {
     return callOptions;
   }
 
-  loadChat() {
+  async loadChat() {
     var callOptions = this.getPrevChatDataCallOptions();
-    axios(callOptions).then((result) => {
-      var prev_received_msgs = this.state.received_msgs;
-      var curr_received_msgs = result.data.values;
-      var unionOfCommonReceivedMessages = lodash.unionWith(
-        prev_received_msgs,
-        curr_received_msgs,
-        lodash.isEqual
-      );
-      unionOfCommonReceivedMessages.sort(function (msg1, msg2) {
-        return msg1["timestamp"] - msg2["timestamp"];
-      });
-      var chatComp = unionOfCommonReceivedMessages.map((data) => {
-        return (
-          <div key={data.timestamp}>
-            {data.sender === this.props.user && (
-              <div className="container">
-                <img
-                  src="https://www.w3schools.com/howto/img_avatar.png"
-                  alt="Avatar"
-                  className="right"
-                />
-                <p style={{ textAlign: "left" }}>{data.chatmsg}</p>
-                <span className="time-left">
+    if (lodash.isEmpty(callOptions)) {
+      return;
+    }
+    var result = await axios(callOptions);
+    var prev_received_msgs = this.state.received_msgs;
+    var curr_received_msgs = result.data.values;
+    var unionOfCommonReceivedMessages = lodash.uniqBy(
+      [...prev_received_msgs, ...curr_received_msgs],
+      "timestamp"
+    );
+    var messages = lodash.sortBy(unionOfCommonReceivedMessages, ["timestamp"]);
+    var chatComp = messages.map((data, index) => {
+      return (
+        <div key={index}>
+          {data.sender === this.props.user && (
+            <div className="container">
+              {console.log(data.image)}
+              <img src={data.image} alt="Avatar" className="right" />
+              <p style={{ textAlign: "left" }}>{data.chatmsg}</p>
+              <span className="time-left">
+                {new Date(data.timestamp).toLocaleString()}
+              </span>
+            </div>
+          )}
+          {data.sender === this.props.logged_in_user &&
+            data.receiver === this.props.user && (
+              <div className="container darker">
+                <img src={this.props.image} alt="Avatar" />
+                <p style={{ textAlign: "right" }}>{data.chatmsg}</p>
+                <span className="time-right">
                   {new Date(data.timestamp).toLocaleString()}
                 </span>
               </div>
             )}
-            {data.sender === this.props.logged_in_user &&
-              data.receiver === this.props.user && (
-                <div className="container darker">
-                  <img
-                    src="https://www.w3schools.com/howto/img_avatar.png"
-                    alt="Avatar"
-                  />
-                  <p style={{ textAlign: "right" }}>{data.chatmsg}</p>
-                  <span className="time-right">
-                    {new Date(data.timestamp).toLocaleString()}
-                  </span>
-                </div>
-              )}
-          </div>
-        );
-      });
-      this.setState({ chat_comp: chatComp });
+        </div>
+      );
     });
+    this.setState({ chat_comp: chatComp });
   }
 
   componentDidMount() {
+    this._isMounted = true;
     socketAPI.socket.on("websocket", (result) => {
       result = JSON.parse(result);
       result["chatmsg"] = this.props.get_decrypted_key(result["chatmsg"]);
       this.setState({
         received_msgs: [result],
       });
+      this.loadChat();
     });
+  }
+
+  componentWillUnmount() {
+    this._isMounted = false;
   }
 
   render() {
     return (
       <Modal
+        onShow={this.loadChat}
         show={this.props.show}
         onHide={this.props.onHide}
         size="lg"
         aria-labelledby="contained-modal-title-vcenter"
-        scrollable={true}
         centered
       >
         <Modal.Header closeButton>
@@ -165,9 +179,9 @@ class ChatModal extends Component {
             {this.props.username}
           </Modal.Title>
         </Modal.Header>
-        <Modal.Body>{this.state.chat_comp}</Modal.Body>
-        <Modal.Footer>
-          <Modal.Body>
+        <Modal.Body>
+          <div style={ChatContainerStyle}>{this.state.chat_comp}</div>
+          <div>
             <Form>
               <Form.Row className="align-items-center">
                 <Col sm={7} className="my-1">
@@ -178,14 +192,6 @@ class ChatModal extends Component {
                   />
                 </Col>
                 <Col xs="auto" className="my-1">
-                  <IconButton
-                    color="primary"
-                    aria-label="load prev chat"
-                    component="span"
-                    onClick={this.loadChat}
-                  >
-                    <CachedIcon />
-                  </IconButton>
                   <IconButton
                     color="primary"
                     aria-label="upload picture"
@@ -200,6 +206,11 @@ class ChatModal extends Component {
                   >
                     <AttachmentIcon />
                   </IconButton>
+                  <input
+                    id="fileInput"
+                    type="file"
+                    style={{ display: "none" }}
+                  />
                   <IconButton
                     color="primary"
                     aria-label="upload picture"
@@ -222,8 +233,8 @@ class ChatModal extends Component {
                 </Col>
               </Form.Row>
             </Form>
-          </Modal.Body>
-        </Modal.Footer>
+          </div>
+        </Modal.Body>
       </Modal>
     );
   }

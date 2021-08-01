@@ -55,32 +55,43 @@ class Login extends Component {
       result = exc?.response;
     }
     this.setState({ ShowNotifications: true });
-    if (result.data.statusCode === 200 && result.data.values[0].auth) {
-      this.setState({ loginResponse: result.data.values[0] });
-      this.setState({
-        response_status: result.data.statusCode === 200 ? "success" : "danger",
-      });
-      this.setState({ response_message: result.data.reasons[0] });
-      cookies.set("userId", this.state.email);
-      cookies.set("password", this.getEncryptedValue(this.state.password, "#"));
-      cookies.set(
-        "x-access-token",
-        this.getEncryptedValue(result.data.values[0].token, "#")
-      );
-      this.setState({ userAuthorized: true });
-      this.props.history.push({
-        pathname: "/admin",
-        user: this.state.email,
-        data: this.state.loginResponse,
-      });
-    } else {
-      this.setState({ response_status: "danger" });
-      if (lodash.includes(STATUS_LIST_TO_SHOW_REASON, result.data.statusCode)) {
+    if (result && result.data) {
+      if (result.data.statusCode === 200 && result.data.values[0].auth) {
+        this.setState({ loginResponse: result.data.values[0] });
+        this.setState({
+          response_status:
+            result.data.statusCode === 200 ? "success" : "danger",
+        });
         this.setState({ response_message: result.data.reasons[0] });
+        cookies.set("userId", this.state.email);
+        cookies.set(
+          "password",
+          this.getEncryptedValue(this.state.password, "#")
+        );
+        cookies.set(
+          "x-access-token",
+          this.getEncryptedValue(result.data.values[0].token, "#")
+        );
+        this.setState({ userAuthorized: true });
+        this.props.history.push({
+          pathname: "/admin",
+          user: this.state.email,
+          data: this.state.loginResponse,
+        });
       } else {
-        var status = result.data.status.split("_").join(" ");
-        this.setState({ response_message: status });
+        this.setState({ response_status: "danger" });
+        if (
+          lodash.includes(STATUS_LIST_TO_SHOW_REASON, result.data.statusCode)
+        ) {
+          this.setState({ response_message: result.data.reasons[0] });
+        } else {
+          var status = result.data.status.split("_").join(" ");
+          this.setState({ response_message: status });
+        }
       }
+    }else {
+      this.setState({ response_status: "danger" });
+      this.setState({ response_message: "Server is not reachable" });
     }
   }
 
@@ -115,6 +126,7 @@ class Login extends Component {
               className="form-control"
               placeholder="Enter email"
               onChange={this.onChange}
+              autoComplete="off"
               required
             />
           </div>
