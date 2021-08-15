@@ -43,7 +43,6 @@ const cardImgStyle = {
   width: "20%",
   height: "20%",
   borderRadius: "50%",
-  borderStyle: "groove",
   display: "flex",
   float: "right",
 };
@@ -233,6 +232,7 @@ class TableList extends Component {
     this.getEncryptedPayload = this.getEncryptedPayload.bind(this);
     this.getEncryptedValue = this.getEncryptedValue.bind(this);
     this.resetStateElements = this.resetStateElements.bind(this);
+    this.getDefaultPicture = this.getDefaultPicture.bind(this);
   }
 
   onChange(event) {
@@ -295,6 +295,24 @@ class TableList extends Component {
     }
     this.setState({ is_admin: result.data.values[0] });
   }
+
+  async getDefaultPicture(username) {
+    var [firstname, lastname] = lodash.split(username, " ");
+    const queryString = `background=0D8ABC&color=fff&name=${firstname}+${lastname}&size=120`;
+    const avatar_options = {
+      method: "GET",
+      url: `https://ui-avatars.com/api/?${queryString}`,
+      responseType: "arraybuffer",
+      timeout: 10 * 1000,
+    };
+    var avatarResult = await axios(avatar_options);
+    var profile_image = Buffer.from(avatarResult.data, "binary").toString(
+      "base64"
+    );
+    profile_image = `data:image/png;base64,${profile_image}`;
+    return profile_image;
+  }
+
   async ProcessAndGetUsers() {
     await this.GetUserType();
     var finalRoute = this.state.is_admin ? "/getCustomer" : "/getAdmins";
@@ -315,6 +333,7 @@ class TableList extends Component {
       this.setState({
         response_message: "You are not authorized to access this page",
       });
+      return;
     }
     this.setState({
       clients: this.state.clients.concat(result.data.values),
@@ -337,8 +356,8 @@ class TableList extends Component {
     const { user_of_activated_modal, email_body, email_subject } = this.state;
     var payload = {
       email: user_of_activated_modal,
-      subject: this.getEncryptedValue(email_subject, "#"),
-      body: this.getEncryptedValue(email_body, "#"),
+      subject: email_subject,
+      body: email_body,
     };
     var encryptedPayload = this.getEncryptedPayload(payload);
     var finalPayload = { payload: encryptedPayload };
@@ -372,6 +391,11 @@ class TableList extends Component {
   async GetUserData() {
     await this.ProcessAndGetUsers();
     var userData = this.state.clients;
+    for (var data of userData) {
+      if (!data.image) {
+        data["image"] = await this.getDefaultPicture(data.name);
+      }
+    }
     const { classes } = this.props;
     var users_list_component = userData.map((data) => {
       return (
