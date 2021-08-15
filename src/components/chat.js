@@ -13,6 +13,9 @@ import { cyan } from "@material-ui/core/colors";
 import axios from "axios";
 import * as socketAPI from "../components/socket";
 import lodash from "lodash";
+import Cookies from "universal-cookie";
+
+const cookies = new Cookies();
 
 const ButtonTheme = createMuiTheme({
   palette: {
@@ -48,6 +51,7 @@ class ChatModal extends Component {
       this.getPrevChatDataCallOptions.bind(this);
     this.encryptKeyStable = this.encryptKeyStable.bind(this);
     this.loadChat = this.loadChat.bind(this);
+    this.getDefaultPicture = this.getDefaultPicture.bind(this);
   }
 
   async makeRequest(callOptions) {
@@ -106,6 +110,28 @@ class ChatModal extends Component {
     return callOptions;
   }
 
+  async getDefaultPicture(username) {
+    var image_from_cookies = cookies.get(`user_${this.props.user}_image`);
+    if(image_from_cookies) {
+      return image_from_cookies;
+    }
+    var [firstname, lastname] = lodash.split(username, " ");
+    const queryString = `background=0D8ABC&color=fff&name=${firstname}+${lastname}&size=120`;
+    const avatar_options = {
+      method: "GET",
+      url: `https://ui-avatars.com/api/?${queryString}`,
+      responseType: "arraybuffer",
+      timeout: 10 * 1000,
+    };
+    var avatarResult = await this.makeRequest(avatar_options);
+    var profile_image = Buffer.from(avatarResult.data, "binary").toString(
+      "base64"
+    );
+    profile_image = `data:image/png;base64,${profile_image}`;
+    cookies.set(`user_${this.props.user}_image`, String(profile_image));
+    return profile_image;
+  }
+
   async loadChat() {
     var callOptions = this.getPrevChatDataCallOptions();
     if (lodash.isEmpty(callOptions)) {
@@ -119,12 +145,16 @@ class ChatModal extends Component {
       "timestamp"
     );
     var messages = lodash.sortBy(unionOfCommonReceivedMessages, ["timestamp"]);
+    for (var message of messages) {
+      if (!message.image) {
+        message["image"] = await this.getDefaultPicture(this.props.username);
+      }
+    }
     var chatComp = messages.map((data, index) => {
       return (
         <div key={index}>
           {data.sender === this.props.user && (
             <div className="container">
-              {console.log(data.image)}
               <img src={data.image} alt="Avatar" className="right" />
               <p style={{ textAlign: "left" }}>{data.chatmsg}</p>
               <span className="time-left">
