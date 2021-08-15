@@ -5,6 +5,9 @@ import Card from "../../components/Card/Card.js";
 import Button from "@material-ui/core/Button";
 import CardHeader from "../../components/Card/CardHeader.js";
 import CardAvatar from "../../components/Card/CardAvatar.js";
+import IconButton from "@material-ui/core/IconButton";
+import PublishIcon from "@material-ui/icons/Publish";
+import DeleteIcon from "@material-ui/icons/Delete";
 import CardBody from "../../components/Card/CardBody.js";
 import CardFooter from "../../components/Card/CardFooter.js";
 import ClearRoundedIcon from "@material-ui/icons/ClearRounded";
@@ -15,7 +18,6 @@ import ErrorOutlineSharpIcon from "@material-ui/icons/ErrorOutlineSharp";
 import UpdateRoundedIcon from "@material-ui/icons/UpdateRounded";
 import HttpsIcon from "@material-ui/icons/HttpsOutlined";
 import Snackbar from "../../components/Snackbar/Snackbar.js";
-import avatar from "../../assets/img/faces/marc.jpg";
 import { Col, Form, Row } from "react-bootstrap";
 import Cookies from "universal-cookie";
 import { AES, enc } from "crypto-js";
@@ -23,7 +25,6 @@ import SelectDropdown from "../../hooks/select.js";
 import lodash from "lodash";
 import axios from "axios";
 import { REMAINDER_FREQUENCY_SLIDER_MARKS } from "../../constants/constants.js";
-
 
 var cardCategoryWhite = {
   color: "rgba(255,255,255,.62)",
@@ -64,8 +65,11 @@ class UserProfile extends Component {
     this.state = {
       username: "",
       email: "",
-      image: "",
-      remainder_frequency: 0,
+      profile_image: "",
+      new_profile_picture_data: {},
+      name: "",
+      user_phone_number: "",
+      remainder_frequency: null,
       prev_password_from_db: "",
       prev_password_from_inp: "",
       new_password_from_inp: "",
@@ -82,7 +86,9 @@ class UserProfile extends Component {
       ShowNotifications: false,
       response_status: "danger",
       response_message: "",
+      mouse_on_image: false,
     };
+    this.inputRef = React.createRef();
     this.onChange = this.onChange.bind(this);
     this.onChangeDropdownValue = this.onChangeDropdownValue.bind(this);
     this.processAndSaveCookiesInState =
@@ -96,6 +102,9 @@ class UserProfile extends Component {
     this.makeRequest = this.makeRequest.bind(this);
     this.checkAndGetRequestType = this.checkAndGetRequestType.bind(this);
     this.buildPatchUrlFromPayload = this.buildPatchUrlFromPayload.bind(this);
+    this.get_user_data = this.get_user_data.bind(this);
+    this.readImage = this.readImage.bind(this);
+    this.deleteProfilePicture = this.deleteProfilePicture.bind(this);
   }
 
   onChange(event) {
@@ -179,7 +188,9 @@ class UserProfile extends Component {
         this.verifyPasswordAndReport() === true) ||
       (this.state.prev_password_from_inp_is_correct === true &&
         this.state.prev_password_from_inp.length > 0) ||
-      this.state.username.length > 0
+      this.state.username.length > 0 ||
+      this.state.remainder_frequency ||
+      this.inputRef.current.files[0]
     );
   }
 
@@ -223,14 +234,30 @@ class UserProfile extends Component {
       }
     }
     if (payload && payload.media) {
-      if (payload.media.profile_picture) {
-        qpArgString += `profile_picture=${payload.media.profile_picture}&`;
+      if (!lodash.isEmpty(this.state.new_profile_picture_data)) {
+        lodash.forOwn(
+          this.state.new_profile_picture_data,
+          function (value, property) {
+            qpArgString += `${property}=${value}&`;
+          }
+        );
       }
     }
     qpArgString = lodash.trimEnd(qpArgString);
     qpArgString = lodash.trimEnd(qpArgString, "&");
     url = url + this.getEncryptedValue(qpArgString, "#");
     return url;
+  }
+
+  readImage(file, isText = false) {
+    return new Promise((resolve, reject) => {
+      var imgReader = new FileReader();
+      imgReader.onload = () => {
+        resolve(imgReader.result);
+      };
+      imgReader.onerror = reject;
+      isText ? imgReader.readAsText(file) : imgReader.readAsDataURL(file);
+    });
   }
 
   async onSubmit(event) {
@@ -247,29 +274,49 @@ class UserProfile extends Component {
     }
     var profile = {};
     var media = {};
-    if (this.state.username.length > 0) {
-      profile["name"] = this.getEncryptedValue(this.state.username, "#");
+    const {
+      username,
+      phone_number,
+      remainder_frequency,
+      new_password_from_inp,
+      passcode,
+      email,
+    } = this.state;
+    if (username.length > 0) {
+      profile["name"] = username;
     }
-    if (this.state.phone_number.length > 0) {
-      profile["phone"] = this.getEncryptedValue(this.state.phone_number, "#");
+    if (phone_number.length > 0) {
+      profile["phone"] = phone_number;
     }
-    if (this.state.remainder_frequency > 0) {
-      profile["remainder_freq"] = this.getEncryptedValue(
-        this.state.remainder_frequency,
-        "#"
-      );
+    if (remainder_frequency) {
+      profile["remainder_freq"] = remainder_frequency;
     }
-    if (this.state.new_password_from_inp.length > 0) {
-      profile["password"] = this.getEncryptedValue(
-        this.state.new_password_from_inp,
-        "#"
-      );
+    if (new_password_from_inp.length > 0) {
+      profile["password"] = new_password_from_inp;
     }
-    if (this.state.passcode.length > 0) {
-      profile["passcode"] = this.getEncryptedValue(this.state.passcode, "#");
+    if (passcode.length > 0) {
+      profile["passcode"] = passcode;
     }
-    if (this.state.image.length > 0) {
-      media["profile_picture"] = this.state.image;
+    if (this.inputRef.current.files[0]) {
+      try {
+        var file = this.inputRef.current.files[0];
+        var data = {
+          imagename: file.name,
+          lastModified: file.lastModified,
+          size: file.size,
+          type: file.type,
+        };
+        var imageUri = await this.readImage(this.inputRef.current.files[0]);
+        this.setState({ new_profile_picture_data: data });
+        media["profile_picture"] = imageUri;
+      } catch (exc) {
+        this.setState({
+          ShowNotifications: true,
+          response_status: "error",
+          response_message:
+            "Not able to process selected image.\nPlease try to upload a valid image file.",
+        });
+      }
     }
     var finalPayload = {},
       payload = {};
@@ -281,13 +328,13 @@ class UserProfile extends Component {
       });
       return;
     } else if (lodash.isEmpty(profile)) {
-      payload["email"] = this.getEncryptedValue(this.state.email, "#");
+      payload["email"] = email;
       payload["media"] = media;
-    } else {
-      payload["email"] = this.getEncryptedValue(this.state.email, "#");
+    } else if (lodash.isEmpty(media)) {
+      payload["email"] = email;
       payload["profile"] = profile;
     }
-    console.log(payload);
+
     finalPayload = { payload: this.getEncryptedPayload(payload) };
     var requestType = this.checkAndGetRequestType(payload);
     const options = {
@@ -308,6 +355,42 @@ class UserProfile extends Component {
           response_message: result.data.reasons[0],
           response_status: "success",
         });
+        await this.get_user_data();
+      } else {
+        if (lodash.includes([400, 500, 502], result.data.statusCode)) {
+          this.setState({
+            response_message: result.data.reasons[0],
+            response_status: "danger",
+          });
+        }
+      }
+    } else {
+      this.setState({
+        response_message:
+          "Encountered error ocurred. Please try to reconnect to internet",
+        response_status: "danger",
+      });
+    }
+  }
+
+  async deleteProfilePicture() {
+    var encryptedQpString = this.getEncryptedValue("image=null", "#");
+    const URL = `http://localhost:3001/user/${cookies.get("userId")}/?${encryptedQpString}`;
+    const options = {
+      method: "DELETE",
+      url: URL,
+      timeout: 60 * 1000,
+      headers: this.GetHeaders(),
+    };
+    var result = await this.makeRequest(options);
+    this.setState({ ShowNotifications: true });
+    if (result && result.data) {
+      if (result.data.statusCode === 200) {
+        this.setState({
+          response_message: result.data.reasons[0],
+          response_status: "success",
+        });
+        await this.get_user_data();
       } else {
         if (lodash.includes([400, 500, 502], result.data.statusCode)) {
           this.setState({
@@ -352,8 +435,46 @@ class UserProfile extends Component {
     });
   }
 
+  async get_user_data() {
+    const URL = `http://localhost:3001/user/${cookies.get("userId")}`;
+    const options = {
+      method: "GET",
+      url: URL,
+      timeout: 60 * 1000,
+      headers: this.GetHeaders(),
+    };
+    var result = await this.makeRequest(options);
+    var values = result.data.values[0];
+    var profile_image = lodash.has(values, "media.image") ? values.media.image : null;
+    // var lastUpdated = lodash.has(values, "media.type") ? values.media.type : null;
+    var username = lodash.has(values, "name") ? values.name : null;
+    var phone = lodash.has(values, "phone") ? values.phone : null;
+    var firstname = lodash.has(values, "firstname") ? values.firstname : null;
+    var lastname = lodash.has(values, "lastname") ? values.lastname : null;
+    if (!profile_image) {
+      const queryString = `background=0D8ABC&color=fff&name=${firstname}+${lastname}&size=120`;
+      const avatar_options = {
+        method: "GET",
+        url: `https://ui-avatars.com/api/?${queryString}`,
+        responseType: "arraybuffer",
+        timeout: 10 * 1000,
+      };
+      var avatarResult = await this.makeRequest(avatar_options);
+      profile_image = Buffer.from(avatarResult.data, "binary").toString(
+        "base64"
+      );
+      profile_image = `data:image/png;base64,${profile_image}`;
+    }
+    this.setState({
+      profile_image: profile_image,
+      name: username,
+      user_phone_number: phone,
+    });
+  }
+
   componentDidMount() {
     this.processAndSaveCookiesInState();
+    this.get_user_data();
   }
 
   render() {
@@ -547,7 +668,7 @@ class UserProfile extends Component {
                       step={1}
                       marks={REMAINDER_FREQUENCY_SLIDER_MARKS}
                       onChange={(event, value) => {
-                        this.setState({ remainder_freq: value });
+                        this.setState({ remainder_frequency: value });
                       }}
                       min={1}
                       max={7}
@@ -572,14 +693,57 @@ class UserProfile extends Component {
           <GridItem xs={12} sm={12} md={4}>
             <Card profile>
               <CardAvatar profile>
-                <a href="#pablo" onClick={(e) => e.preventDefault()}>
-                  <img src={avatar} alt="..." />
-                </a>
+                <input
+                  type="file"
+                  id="profile_img_file"
+                  ref={this.inputRef}
+                  accept="image/png, image/jpeg"
+                  style={{ display: "none" }}
+                />
+                <div
+                  className="profile-image"
+                  onMouseOver={() => this.setState({ mouse_on_image: true })}
+                  onMouseLeave={() => this.setState({ mouse_on_image: false })}
+                >
+                  <img
+                    style={{ opacity: this.state.mouse_on_image ? "0" : "1" }}
+                    src={this.state.profile_image}
+                    alt="profile_picture"
+                  />
+                  {this.state.mouse_on_image && (
+                    <div
+                      style={{
+                        position: "absolute",
+                        display: "flex",
+                        justifyContent: "center",
+                        flexDirection: "row",
+                        top: "-2%",
+                        left: "40%",
+                      }}
+                    >
+                      <IconButton
+                        color="default"
+                        size="medium"
+                        onClick={() => {
+                          this.inputRef.current.click();
+                        }}
+                      >
+                        <PublishIcon />
+                      </IconButton>
+                      <IconButton
+                        color="secondary"
+                        size="medium"
+                        onClick={() => this.deleteProfilePicture()}
+                      >
+                        <DeleteIcon />
+                      </IconButton>
+                    </div>
+                  )}
+                </div>
               </CardAvatar>
               <CardBody profile>
-                <h6 className="title">CEO / CO-FOUNDER</h6>
-                <h4 className="name">Alec Thompson</h4>
-                <Button variant="outlined">Follow</Button>
+                <h5 className="name">{this.state.name}</h5>
+                <h6 className="phone">{this.state.user_phone_number}</h6>
               </CardBody>
             </Card>
           </GridItem>
