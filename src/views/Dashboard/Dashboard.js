@@ -1,50 +1,138 @@
-import React from "react";
+import React, { useState } from "react";
 // @material-ui/core
 import { makeStyles } from "@material-ui/core/styles";
 // @material-ui/icons
-import LocalOffer from "@material-ui/icons/LocalOffer";
 import Update from "@material-ui/icons/Update";
 import Accessibility from "@material-ui/icons/Accessibility";
-import BugReport from "@material-ui/icons/BugReport";
-import Code from "@material-ui/icons/Code";
-import Cloud from "@material-ui/icons/Cloud";
-import ErrorOutlineIcon from '@material-ui/icons/ErrorOutline';
+import ErrorOutlineIcon from "@material-ui/icons/ErrorOutline";
+import DoneOutlineIcon from "@material-ui/icons/DoneOutline";
+import Button from "@material-ui/core/Button";
 // core components
 import GridItem from "../../components/Grid/GridItem.js";
 import GridContainer from "../../components/Grid/GridContainer.js";
-import Table from "../../components/Table/Table.js";
-import Tasks from "../../components/Tasks/Tasks.js";
-import CustomTabs from "../../components/CustomTabs/CustomTabs.js";
 import Card from "../../components/Card/Card.js";
 import CardHeader from "../../components/Card/CardHeader.js";
 import CardIcon from "../../components/Card/CardIcon.js";
-import CardBody from "../../components/Card/CardBody.js";
 import CardFooter from "../../components/Card/CardFooter.js";
-import { bugs, website, server } from "../../variables/general.js";
-
+import axios from "axios";
 import styles from "../../assets/jss/material-dashboard-react/views/dashboardStyle.js";
+import { Col, Row } from "react-bootstrap";
 
 const useStyles = makeStyles(styles);
 
+var getGitHubIssues = async function (type, server = true) {
+  var URL = server
+    ? "https://api.github.com/repos/AbinashB1997/CRM/issues"
+    : "https://api.github.com/repos/AbinashB1997/crm-client/issues";
+  var callOptions = {
+    method: "GET",
+    url: URL,
+    headers: { Accept: "application/vnd.github.v3+json" },
+    timeout: 60 * 1000,
+    params: { state: type },
+  };
+  var data = await axios(callOptions);
+  return data.data;
+};
+
+function GetIssueCount(props) {
+  return (
+    <>
+      <a
+        href={
+          props.type === "open"
+            ? "https://github.com/AbinashB1997/CRM/issues?q=is:open"
+            : "https://github.com/AbinashB1997/CRM/issues?q=is:closed"
+        }
+      >
+        {props.serverIssues}
+      </a>{" "}
+      :{" "}
+      <a
+        href={
+          props.type === "open"
+            ? "https://github.com/AbinashB1997/crm-client/issues?q=is:open"
+            : "https://github.com/AbinashB1997/crm-client/issues?q=is:closed"
+        }
+      >
+        {props.ClientIssues}{" "}
+      </a>
+    </>
+  );
+}
+
 export default function Dashboard() {
   const classes = useStyles();
+  var [activeServerIssues, SetActiveServerIssues] = useState("-");
+  var [closedServerIssues, SetClosedServerIssues] = useState("-");
+  var [activeClientIssues, SetActiveClientIssues] = useState("-");
+  var [closedClientIssues, SetClosedClientIssues] = useState("-");
+  var [issueCardColor, SetIssueCardColor] = useState("danger");
   return (
     <div>
       <GridContainer>
         <GridItem xs={12} sm={6} md={3}>
           <Card>
-            <CardHeader color="danger" stats icon>
-              <CardIcon color="danger">
-                <ErrorOutlineIcon />
+            <CardHeader color={issueCardColor} stats icon>
+              <CardIcon color={issueCardColor}>
+                {issueCardColor === "danger" && <ErrorOutlineIcon />}
+                {issueCardColor === "success" && <DoneOutlineIcon />}
               </CardIcon>
-              <p className={classes.cardCategory}>Fixed Issues</p>
-              <h3 className={classes.cardTitle}>75</h3>
+              <p className={classes.cardCategory}>
+                {issueCardColor === "danger"
+                  ? "Active Issues"
+                  : "Closed Issues"}
+              </p>
+              <h3 className={classes.cardTitle}>
+                {issueCardColor === "danger" && (
+                  <GetIssueCount
+                    type="open"
+                    serverIssues={activeServerIssues}
+                    ClientIssues={activeClientIssues}
+                  />
+                )}
+                {issueCardColor === "success" && (
+                  <GetIssueCount
+                    type="closed"
+                    serverIssues={closedServerIssues}
+                    ClientIssues={closedClientIssues}
+                  />
+                )}
+              </h3>
             </CardHeader>
             <CardFooter stats>
-              <div className={classes.stats}>
-                <LocalOffer />
-                Tracked from Github
-              </div>
+              <Row>
+                <Col xs="auto">
+                  <Button
+                    variant="outlined"
+                    color="secondary"
+                    onClick={async function () {
+                      var serverIssues = await getGitHubIssues("open", true);
+                      var clientIssues = await getGitHubIssues("open", false);
+                      SetActiveServerIssues(serverIssues.length);
+                      SetActiveClientIssues(clientIssues.length);
+                      SetIssueCardColor("danger");
+                    }}
+                  >
+                    Active Issue
+                  </Button>
+                </Col>
+                <Col xs="auto">
+                  <Button
+                    variant="outlined"
+                    color="primary"
+                    onClick={async function () {
+                      var serverIssues = await getGitHubIssues("closed", true);
+                      var clientIssues = await getGitHubIssues("closed", false);
+                      SetClosedClientIssues(clientIssues.length);
+                      SetClosedServerIssues(serverIssues.length);
+                      SetIssueCardColor("success");
+                    }}
+                  >
+                    Closed Issue
+                  </Button>
+                </Col>
+              </Row>
             </CardFooter>
           </Card>
         </GridItem>
@@ -63,71 +151,6 @@ export default function Dashboard() {
                 Just Updated
               </div>
             </CardFooter>
-          </Card>
-        </GridItem>
-      </GridContainer>
-      <GridContainer>
-        <GridItem xs={12} sm={12} md={6}>
-          <CustomTabs
-            title="Tasks:"
-            headerColor="primary"
-            tabs={[
-              {
-                tabName: "Bugs",
-                tabIcon: BugReport,
-                tabContent: (
-                  <Tasks
-                    checkedIndexes={[0, 3]}
-                    tasksIndexes={[0, 1, 2, 3]}
-                    tasks={bugs}
-                  />
-                ),
-              },
-              {
-                tabName: "Website",
-                tabIcon: Code,
-                tabContent: (
-                  <Tasks
-                    checkedIndexes={[0]}
-                    tasksIndexes={[0, 1]}
-                    tasks={website}
-                  />
-                ),
-              },
-              {
-                tabName: "Server",
-                tabIcon: Cloud,
-                tabContent: (
-                  <Tasks
-                    checkedIndexes={[1]}
-                    tasksIndexes={[0, 1, 2]}
-                    tasks={server}
-                  />
-                ),
-              },
-            ]}
-          />
-        </GridItem>
-        <GridItem xs={12} sm={12} md={6}>
-          <Card>
-            <CardHeader color="warning">
-              <h4 className={classes.cardTitleWhite}>New Clients</h4>
-              <p className={classes.cardCategoryWhite}>
-                New Clients joined in 30 days
-              </p>
-            </CardHeader>
-            <CardBody>
-              <Table
-                tableHeaderColor="warning"
-                tableHead={["Name", "Email", "Date of Joining"]}
-                tableData={[
-                  ["Abinash Biswal", "abinashbiswal247@gmail.com", "1-July-2021"],
-                  ["Pinku", "pinku@gmail.com", "21-June-2021"],
-                  ["Prakash Sahoo", "prakash.sahoo@gmail.com", "25-June-2021"],
-                  ["Abhisek Behera", "abinashbiswal247@gmail.com", "10-June-2021"]
-                ]}
-              />
-            </CardBody>
           </Card>
         </GridItem>
       </GridContainer>

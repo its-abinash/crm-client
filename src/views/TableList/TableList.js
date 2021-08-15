@@ -14,6 +14,7 @@ import CheckCircleSharpIcon from "@material-ui/icons/CheckCircleSharp";
 import ErrorOutlineSharpIcon from "@material-ui/icons/ErrorOutlineSharp";
 import Button from "@material-ui/core/Button";
 import CircularProgress from "@material-ui/core/CircularProgress";
+import HttpsIcon from "@material-ui/icons/HttpsOutlined";
 import Snackbar from "../../components/Snackbar/Snackbar.js";
 import {
   withStyles,
@@ -42,7 +43,6 @@ const cardImgStyle = {
   width: "20%",
   height: "20%",
   borderRadius: "50%",
-  borderStyle: "groove",
   display: "flex",
   float: "right",
 };
@@ -79,6 +79,12 @@ const ButtonTheme = createMuiTheme({
   },
 });
 
+const IconMap = {
+  success: CheckCircleSharpIcon,
+  danger: ErrorOutlineSharpIcon,
+  warning: HttpsIcon,
+};
+
 function EmailModal(props) {
   return (
     <Modal
@@ -101,7 +107,7 @@ function EmailModal(props) {
       <Modal.Body>
         <Form>
           <Form.Group controlId="formGridEmail">
-            <Form.Label>Email</Form.Label>
+            <Form.Label>To</Form.Label>
             <Form.Control
               type="email"
               placeholder="Enter email"
@@ -176,7 +182,6 @@ function DeleteModal(props) {
               />
             </Col>
             <Col className="delete-user-btn">
-              {console.log(props.isChecked)}
               <Button
                 variant="contained"
                 style={deleteBtnStyle}
@@ -204,6 +209,8 @@ class TableList extends Component {
       EmailModalShow: false,
       user_of_activated_modal: "",
       username_of_activated_modal: "",
+      image_of_activated_modal:
+        "https://www.w3schools.com/howto/img_avatar.png",
       ChatModalShow: false,
       clients: [],
       users_component: [],
@@ -225,11 +232,11 @@ class TableList extends Component {
     this.getEncryptedPayload = this.getEncryptedPayload.bind(this);
     this.getEncryptedValue = this.getEncryptedValue.bind(this);
     this.resetStateElements = this.resetStateElements.bind(this);
+    this.getDefaultPicture = this.getDefaultPicture.bind(this);
   }
 
   onChange(event) {
     if (event.target.name === "isChecked") {
-      console.log(event.target.name, event.target.checked);
       this.setState({ [event.target.name]: event.target.checked });
     } else {
       this.setState({ [event.target.name]: event.target.value });
@@ -288,6 +295,24 @@ class TableList extends Component {
     }
     this.setState({ is_admin: result.data.values[0] });
   }
+
+  async getDefaultPicture(username) {
+    var [firstname, lastname] = lodash.split(username, " ");
+    const queryString = `background=0D8ABC&color=fff&name=${firstname}+${lastname}&size=120`;
+    const avatar_options = {
+      method: "GET",
+      url: `https://ui-avatars.com/api/?${queryString}`,
+      responseType: "arraybuffer",
+      timeout: 10 * 1000,
+    };
+    var avatarResult = await axios(avatar_options);
+    var profile_image = Buffer.from(avatarResult.data, "binary").toString(
+      "base64"
+    );
+    profile_image = `data:image/png;base64,${profile_image}`;
+    return profile_image;
+  }
+
   async ProcessAndGetUsers() {
     await this.GetUserType();
     var finalRoute = this.state.is_admin ? "/getCustomer" : "/getAdmins";
@@ -301,6 +326,14 @@ class TableList extends Component {
       var result = await axios(options);
     } catch (exc) {
       result = exc?.response;
+    }
+    if (result.data.statusCode === 401) {
+      this.setState({ response_status: "danger" });
+      this.setState({ ShowNotifications: true });
+      this.setState({
+        response_message: "You are not authorized to access this page",
+      });
+      return;
     }
     this.setState({
       clients: this.state.clients.concat(result.data.values),
@@ -323,8 +356,8 @@ class TableList extends Component {
     const { user_of_activated_modal, email_body, email_subject } = this.state;
     var payload = {
       email: user_of_activated_modal,
-      subject: this.getEncryptedValue(email_subject, "#"),
-      body: this.getEncryptedValue(email_body, "#"),
+      subject: email_subject,
+      body: email_body,
     };
     var encryptedPayload = this.getEncryptedPayload(payload);
     var finalPayload = { payload: encryptedPayload };
@@ -358,6 +391,11 @@ class TableList extends Component {
   async GetUserData() {
     await this.ProcessAndGetUsers();
     var userData = this.state.clients;
+    for (var data of userData) {
+      if (!data.image) {
+        data["image"] = await this.getDefaultPicture(data.name);
+      }
+    }
     const { classes } = this.props;
     var users_list_component = userData.map((data) => {
       return (
@@ -419,6 +457,7 @@ class TableList extends Component {
                     this.setState({ ChatModalShow: true });
                     this.setState({ user_of_activated_modal: data.email });
                     this.setState({ username_of_activated_modal: data.name });
+                    this.setState({ image_of_activated_modal: data.image });
                   }}
                 >
                   Chat
@@ -457,6 +496,7 @@ class TableList extends Component {
           user={this.state.user_of_activated_modal}
           username={this.state.username_of_activated_modal}
           logged_in_user={this.state.logged_in_user}
+          image={this.state.image_of_activated_modal}
           show={this.state.ChatModalShow}
           get_headers={this.GetHeaders}
           get_encrypted_value={this.getEncryptedValue}
@@ -475,11 +515,7 @@ class TableList extends Component {
         {this.state.ShowNotifications ? (
           <Snackbar
             color={this.state.response_status}
-            icon={
-              this.state.response_status === "success"
-                ? CheckCircleSharpIcon
-                : ErrorOutlineSharpIcon
-            }
+            icon={IconMap[this.state.response_status]}
             message={this.state.response_message}
             open={this.state.ShowNotifications}
             closeNotification={() =>

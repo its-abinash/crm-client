@@ -1,6 +1,6 @@
 import React from "react";
 import classNames from "classnames";
-// @material-ui/core components
+import Cookies from "universal-cookie";
 import { makeStyles } from "@material-ui/core/styles";
 import MenuItem from "@material-ui/core/MenuItem";
 import MenuList from "@material-ui/core/MenuList";
@@ -10,23 +10,23 @@ import ClickAwayListener from "@material-ui/core/ClickAwayListener";
 import Hidden from "@material-ui/core/Hidden";
 import Poppers from "@material-ui/core/Popper";
 import Divider from "@material-ui/core/Divider";
-// @material-ui/icons
 import Person from "@material-ui/icons/Person";
 import Notifications from "@material-ui/icons/Notifications";
 import Dashboard from "@material-ui/icons/Dashboard";
-import Search from "@material-ui/icons/Search";
-// core components
-import CustomInput from "../../components/CustomInput/CustomInput.js";
-import Button from "../../components/CustomButtons/Button.js";
-
+import Button from "@material-ui/core/Button";
+import lodash from "lodash";
 import styles from "../../assets/jss/material-dashboard-react/components/headerLinksStyle.js";
+import { useHistory } from "react-router-dom";
 
 const useStyles = makeStyles(styles);
+
+const cookies = new Cookies();
 
 export default function AdminNavbarLinks() {
   const classes = useStyles();
   const [openNotification, setOpenNotification] = React.useState(null);
   const [openProfile, setOpenProfile] = React.useState(null);
+  const history = useHistory();
   const handleClickNotification = (event) => {
     if (openNotification && openNotification.contains(event.target)) {
       setOpenNotification(null);
@@ -45,32 +45,22 @@ export default function AdminNavbarLinks() {
     }
   };
   const handleCloseProfile = () => {
-    setOpenProfile(null);
+    var cookiesList = cookies.getAll();
+    for (const key of lodash.keys(cookiesList)) {
+      cookies.remove(key);
+    }
+    history.push("/sign-in");
   };
   return (
     <div>
-      <div className={classes.searchWrapper}>
-        <CustomInput
-          formControlProps={{
-            className: classes.margin + " " + classes.search,
-          }}
-          inputProps={{
-            placeholder: "Search",
-            inputProps: {
-              "aria-label": "Search",
-            },
-          }}
-        />
-        <Button color="white" aria-label="edit" justIcon round>
-          <Search />
-        </Button>
-      </div>
+      <div className={classes.searchWrapper}></div>
       <Button
-        color={window.innerWidth > 959 ? "transparent" : "white"}
-        justIcon={window.innerWidth > 959}
-        simple={!(window.innerWidth > 959)}
+        color={window.innerWidth > 959 ? "inherit" : "white"}
         aria-label="Dashboard"
         className={classes.buttonLink}
+        onClick={() => {
+          history.push("/admin/dashboard");
+        }}
       >
         <Dashboard className={classes.icons} />
         <Hidden mdUp implementation="css">
@@ -79,9 +69,7 @@ export default function AdminNavbarLinks() {
       </Button>
       <div className={classes.manager}>
         <Button
-          color={window.innerWidth > 959 ? "transparent" : "white"}
-          justIcon={window.innerWidth > 959}
-          simple={!(window.innerWidth > 959)}
+          color={window.innerWidth > 959 ? "inherit" : "white"}
           aria-owns={openNotification ? "notification-menu-list-grow" : null}
           aria-haspopup="true"
           onClick={handleClickNotification}
@@ -157,9 +145,7 @@ export default function AdminNavbarLinks() {
       </div>
       <div className={classes.manager}>
         <Button
-          color={window.innerWidth > 959 ? "transparent" : "white"}
-          justIcon={window.innerWidth > 959}
-          simple={!(window.innerWidth > 959)}
+          color={window.innerWidth > 959 ? "inherit" : "white"}
           aria-owns={openProfile ? "profile-menu-list-grow" : null}
           aria-haspopup="true"
           onClick={handleClickProfile}
@@ -191,16 +177,20 @@ export default function AdminNavbarLinks() {
               }}
             >
               <Paper>
-                <ClickAwayListener onClickAway={handleCloseProfile}>
+                <ClickAwayListener
+                  onClickAway={() => {
+                    setOpenProfile(null);
+                  }}
+                >
                   <MenuList role="menu">
                     <MenuItem
-                      onClick={handleCloseProfile}
+                      onClick={() => {}}
                       className={classes.dropdownItem}
                     >
                       Profile
                     </MenuItem>
                     <MenuItem
-                      onClick={handleCloseProfile}
+                      onClick={() => {}}
                       className={classes.dropdownItem}
                     >
                       Settings
