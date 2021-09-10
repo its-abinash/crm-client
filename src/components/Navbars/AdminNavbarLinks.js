@@ -1,6 +1,7 @@
 import React from "react";
 import classNames from "classnames";
 import Cookies from "universal-cookie";
+import { socket } from "../socket";
 import { makeStyles } from "@material-ui/core/styles";
 import MenuItem from "@material-ui/core/MenuItem";
 import MenuList from "@material-ui/core/MenuList";
@@ -12,21 +13,43 @@ import Poppers from "@material-ui/core/Popper";
 import Divider from "@material-ui/core/Divider";
 import Person from "@material-ui/icons/Person";
 import Notifications from "@material-ui/icons/Notifications";
+import Badge from "@material-ui/core/Badge";
+import IconButton from "@material-ui/core/IconButton";
 import Dashboard from "@material-ui/icons/Dashboard";
 import Button from "@material-ui/core/Button";
 import lodash from "lodash";
 import styles from "../../assets/jss/material-dashboard-react/components/headerLinksStyle.js";
 import { useHistory } from "react-router-dom";
-
+import NotificationUtil from "../../views/Notifications/NotificationUtils.js";
+import { withStyles } from "@material-ui/core/styles";
 const useStyles = makeStyles(styles);
 
 const cookies = new Cookies();
+
+const StyledBadge = withStyles((theme) => ({
+  badge: {
+    right: -3,
+    top: 13,
+    border: `2px solid ${theme.palette.background.paper}`,
+    padding: "0 4px",
+  },
+}))(Badge);
 
 export default function AdminNavbarLinks() {
   const classes = useStyles();
   const [openNotification, setOpenNotification] = React.useState(null);
   const [openProfile, setOpenProfile] = React.useState(null);
   const history = useHistory();
+  const [notifications, setNotification] = React.useState([]);
+  React.useEffect(() => {
+    socket.on("CrmSync", (result) => {
+      setNotification([...notifications, ...result.reasons]);
+    });
+    return function cleanup() {
+      socket.disconnect();
+    };
+  });
+
   const handleClickNotification = (event) => {
     if (openNotification && openNotification.contains(event.target)) {
       setOpenNotification(null);
@@ -68,21 +91,11 @@ export default function AdminNavbarLinks() {
         </Hidden>
       </Button>
       <div className={classes.manager}>
-        <Button
-          color={window.innerWidth > 959 ? "inherit" : "white"}
-          aria-owns={openNotification ? "notification-menu-list-grow" : null}
-          aria-haspopup="true"
-          onClick={handleClickNotification}
-          className={classes.buttonLink}
-        >
-          <Notifications className={classes.icons} />
-          <span className={classes.notifications}>5</span>
-          <Hidden mdUp implementation="css">
-            <p onClick={handleCloseNotification} className={classes.linkText}>
-              Notification
-            </p>
-          </Hidden>
-        </Button>
+        <IconButton aria-label="cart" onClick={handleClickNotification}>
+          <StyledBadge badgeContent={notifications.length} color="primary">
+            <Notifications />
+          </StyledBadge>
+        </IconButton>
         <Poppers
           open={Boolean(openNotification)}
           anchorEl={openNotification}
@@ -104,40 +117,11 @@ export default function AdminNavbarLinks() {
               }}
             >
               <Paper>
-                <ClickAwayListener onClickAway={handleCloseNotification}>
-                  <MenuList role="menu">
-                    <MenuItem
-                      onClick={handleCloseNotification}
-                      className={classes.dropdownItem}
-                    >
-                      Mike John responded to your email
-                    </MenuItem>
-                    <MenuItem
-                      onClick={handleCloseNotification}
-                      className={classes.dropdownItem}
-                    >
-                      You have 5 new tasks
-                    </MenuItem>
-                    <MenuItem
-                      onClick={handleCloseNotification}
-                      className={classes.dropdownItem}
-                    >
-                      You{"'"}re now friend with Andrew
-                    </MenuItem>
-                    <MenuItem
-                      onClick={handleCloseNotification}
-                      className={classes.dropdownItem}
-                    >
-                      Another Notification
-                    </MenuItem>
-                    <MenuItem
-                      onClick={handleCloseNotification}
-                      className={classes.dropdownItem}
-                    >
-                      Another One
-                    </MenuItem>
-                  </MenuList>
-                </ClickAwayListener>
+                <NotificationUtil
+                  classes={classes}
+                  handleCloseNotification={handleCloseNotification}
+                  notifications={notifications}
+                />
               </Paper>
             </Grow>
           )}
