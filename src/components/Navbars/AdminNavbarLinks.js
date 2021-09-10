@@ -1,7 +1,7 @@
 import React from "react";
 import classNames from "classnames";
 import Cookies from "universal-cookie";
-import { socket } from "../socket";
+import clientSocket from "socket.io-client";
 import { makeStyles } from "@material-ui/core/styles";
 import MenuItem from "@material-ui/core/MenuItem";
 import MenuList from "@material-ui/core/MenuList";
@@ -25,6 +25,7 @@ import { withStyles } from "@material-ui/core/styles";
 const useStyles = makeStyles(styles);
 
 const cookies = new Cookies();
+const SOCKET_URL = "http://localhost:3001";
 
 const StyledBadge = withStyles((theme) => ({
   badge: {
@@ -42,6 +43,7 @@ export default function AdminNavbarLinks() {
   const history = useHistory();
   const [notifications, setNotification] = React.useState([]);
   React.useEffect(() => {
+    const socket = clientSocket(SOCKET_URL);
     socket.on("CrmSync", (result) => {
       setNotification([...notifications, ...result.reasons]);
     });
