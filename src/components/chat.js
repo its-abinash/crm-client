@@ -11,9 +11,10 @@ import PhotoCamera from "@material-ui/icons/PhotoCamera";
 import { ThemeProvider, createMuiTheme } from "@material-ui/core/styles";
 import { cyan } from "@material-ui/core/colors";
 import axios from "axios";
-import * as socketAPI from "../components/socket";
+import clientSocket from "socket.io-client";
 import lodash from "lodash";
 import Cookies from "universal-cookie";
+import { getRandomColor } from "../utils";
 
 const cookies = new Cookies();
 
@@ -33,7 +34,6 @@ const ChatContainerStyle = {
 };
 
 class ChatModal extends Component {
-  _isMounted = false;
   _init_rendering = false; // This is to ensure that the loadChat has been
   // called once per page refresh to load the chat once in beginning
 
@@ -43,7 +43,16 @@ class ChatModal extends Component {
       chat_message: "",
       received_msgs: [],
       chat_comp: [],
+      socketUrl: "http://localhost:3001",
     };
+    // We are creating new socket client and disconnecting it while unmounting DOM
+    // for each transaction.
+    // Issue with Signleton-Design in this usecase ->
+    // If we consider only one socket then after DOM rendering complete
+    // we close/disconnect the socket in componentWillUnmount().
+    // This will cause the receiver to not consume/receive the message via socket,
+    // since the connection was closed after first transaction (After sending the msg)
+    this.socket = clientSocket(this.state.socketUrl);
     this.sendChat = this.sendChat.bind(this);
     this.onChange = this.onChange.bind(this);
     this.makeRequest = this.makeRequest.bind(this);
@@ -112,11 +121,11 @@ class ChatModal extends Component {
 
   async getDefaultPicture(username) {
     var image_from_cookies = cookies.get(`user_${this.props.user}_image`);
-    if(image_from_cookies) {
+    if (image_from_cookies) {
       return image_from_cookies;
     }
     var [firstname, lastname] = lodash.split(username, " ");
-    const queryString = `background=0D8ABC&color=fff&name=${firstname}+${lastname}&size=120`;
+    const queryString = `background=${getRandomColor()}&color=fff&name=${firstname}+${lastname}&size=120`;
     const avatar_options = {
       method: "GET",
       url: `https://ui-avatars.com/api/?${queryString}`,
@@ -179,9 +188,10 @@ class ChatModal extends Component {
   }
 
   componentDidMount() {
-    this._isMounted = true;
-    socketAPI.socket.on("websocket", (result) => {
-      result = JSON.parse(result);
+    // After Sending a chat, the message goes to server and server tries to save it in DB. After successfully storing in
+    // DB, we get the same message back from server to "ChatSync" socket as an acknowledgement that, the message has successfully
+    // been processed. Now, we render the same message in sender's div
+    this.socket.on("ChatSync", (result) => {
       result["chatmsg"] = this.props.get_decrypted_key(result["chatmsg"]);
       this.setState({
         received_msgs: [result],
@@ -191,7 +201,7 @@ class ChatModal extends Component {
   }
 
   componentWillUnmount() {
-    this._isMounted = false;
+    this.socket.disconnect();
   }
 
   render() {
