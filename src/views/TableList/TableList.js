@@ -27,6 +27,7 @@ import axios from "axios";
 import lodash from "lodash";
 import ChatModal from "../../components/chat.js";
 import Cookies from "universal-cookie";
+import { getRandomColor } from "../../utils";
 
 const cookies = new Cookies();
 
@@ -122,6 +123,7 @@ function EmailModal(props) {
               placeholder="Enter Email Subject"
               name="email_subject"
               id="email_subject"
+              onChange={props.onChange}
             />
           </Form.Group>
 
@@ -132,6 +134,7 @@ function EmailModal(props) {
               name="email_body"
               id="email_body"
               rows={5}
+              onChange={props.onChange}
             />
           </Form.Group>
 
@@ -231,7 +234,6 @@ class TableList extends Component {
     this.onEmailSubmit = this.onEmailSubmit.bind(this);
     this.getEncryptedPayload = this.getEncryptedPayload.bind(this);
     this.getEncryptedValue = this.getEncryptedValue.bind(this);
-    this.resetStateElements = this.resetStateElements.bind(this);
     this.getDefaultPicture = this.getDefaultPicture.bind(this);
   }
 
@@ -298,7 +300,7 @@ class TableList extends Component {
 
   async getDefaultPicture(username) {
     var [firstname, lastname] = lodash.split(username, " ");
-    const queryString = `background=0D8ABC&color=fff&name=${firstname}+${lastname}&size=120`;
+    const queryString = `background=${getRandomColor()}&color=fff&name=${firstname}+${lastname}&size=120`;
     const avatar_options = {
       method: "GET",
       url: `https://ui-avatars.com/api/?${queryString}`,
@@ -340,24 +342,13 @@ class TableList extends Component {
     });
   }
 
-  resetStateElements(options = null) {
-    if (options) {
-      this.setState({ response_status: options.response_status });
-      this.setState({ response_message: options.response_message });
-    }
-    document.getElementById("email_subject").value = "";
-    document.getElementById("email_body").value = "";
-    this.setState({ loading: "false" });
-    this.setState({ ShowNotifications: true });
-  }
   async onEmailSubmit(event) {
     event.preventDefault();
-    this.setState({ loading: "true" });
     const { user_of_activated_modal, email_body, email_subject } = this.state;
     var payload = {
       email: user_of_activated_modal,
-      subject: email_subject,
-      body: email_body,
+      subject: this.getEncryptedValue(email_subject, "#"),
+      body: this.getEncryptedValue(email_body, "#"),
     };
     var encryptedPayload = this.getEncryptedPayload(payload);
     var finalPayload = { payload: encryptedPayload };
@@ -368,23 +359,20 @@ class TableList extends Component {
       timeout: 60 * 1000,
       data: finalPayload,
     };
-    var resetOptions = {
-      response_status: "",
-      response_message: "",
-    };
     try {
       var result = await axios(callOptions);
-      resetOptions["response_status"] =
-        result.data.statusCode === 200 ? "success" : "danger";
-      resetOptions["response_message"] =
-        result.data.reasons[0] || "Uncaught Error";
-      this.resetStateElements(resetOptions);
+      this.setState({
+        response_status: "success",
+        response_message: result.data.reasons[0],
+        ShowNotifications: true,
+      });
     } catch (exc) {
-      result = exc?.response; // Backtrack to fetch the API response
-      resetOptions["response_status"] = "danger";
-      resetOptions["response_message"] =
-        result.data.reasons[0] || "Uncaught Error";
-      this.resetStateElements(resetOptions);
+      result = exc?.response;
+      this.setState({
+        response_status: "danger",
+        response_message: result.data.reasons[0],
+        ShowNotifications: true,
+      });
     }
   }
 

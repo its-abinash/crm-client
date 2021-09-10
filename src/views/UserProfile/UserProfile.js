@@ -25,6 +25,7 @@ import SelectDropdown from "../../hooks/select.js";
 import lodash from "lodash";
 import axios from "axios";
 import { REMAINDER_FREQUENCY_SLIDER_MARKS } from "../../constants/constants.js";
+import { getRandomColor } from "../../utils";
 
 var cardCategoryWhite = {
   color: "rgba(255,255,255,.62)",
@@ -375,7 +376,9 @@ class UserProfile extends Component {
 
   async deleteProfilePicture() {
     var encryptedQpString = this.getEncryptedValue("image=null", "#");
-    const URL = `http://localhost:3001/user/${cookies.get("userId")}/?${encryptedQpString}`;
+    const URL = `http://localhost:3001/user/${cookies.get(
+      "userId"
+    )}/?${encryptedQpString}`;
     const options = {
       method: "DELETE",
       url: URL,
@@ -445,14 +448,16 @@ class UserProfile extends Component {
     };
     var result = await this.makeRequest(options);
     var values = result.data.values[0];
-    var profile_image = lodash.has(values, "media.image") ? values.media.image : null;
+    var profile_image = lodash.has(values, "media.image")
+      ? values.media.image
+      : null;
     // var lastUpdated = lodash.has(values, "media.type") ? values.media.type : null;
     var username = lodash.has(values, "name") ? values.name : null;
     var phone = lodash.has(values, "phone") ? values.phone : null;
     var firstname = lodash.has(values, "firstname") ? values.firstname : null;
     var lastname = lodash.has(values, "lastname") ? values.lastname : null;
     if (!profile_image) {
-      const queryString = `background=0D8ABC&color=fff&name=${firstname}+${lastname}&size=120`;
+      const queryString = `background=${getRandomColor()}&color=fff&name=${firstname}+${lastname}&size=120`;
       const avatar_options = {
         method: "GET",
         url: `https://ui-avatars.com/api/?${queryString}`,
