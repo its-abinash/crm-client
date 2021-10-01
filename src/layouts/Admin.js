@@ -12,9 +12,6 @@ import routes from "../routes.js";
 
 import styles from "../assets/jss/material-dashboard-react/layouts/adminStyle";
 
-import bgImage from "../assets/img/sidebar-2.jpg";
-import logo from "../assets/img/reactlogo.png";
-
 const switchRoutes = (
   <Switch>
     {routes.map((prop, key) => {
@@ -41,7 +38,6 @@ export default function Admin({ ...rest }) {
   // ref to help us initialize PerfectScrollbar on windows devices
   const mainPanel = React.createRef();
   // states and functions
-  const [image] = React.useState(bgImage);
   const [color] = React.useState("blue");
   const [mobileOpen, setMobileOpen] = React.useState(false);
 
@@ -54,8 +50,8 @@ export default function Admin({ ...rest }) {
       <Sidebar
         routes={routes}
         logoText={"CRM"}
-        logo={logo}
-        image={image}
+        logo={null}
+        image={null}
         handleDrawerToggle={handleDrawerToggle}
         open={mobileOpen}
         color={color}
