@@ -1,11 +1,8 @@
-import Card from "react-bootstrap/Card";
+import { lazy, Suspense } from "react";
 import Modal from "react-bootstrap/Modal";
 import Form from "react-bootstrap/Form";
 import Col from "react-bootstrap/Col";
 import React, { Component } from "react";
-import DeleteIcon from "@material-ui/icons/Delete";
-import EmailIcon from "@material-ui/icons/Email";
-import ChatIcon from "@material-ui/icons/Chat";
 import SendIcon from "@material-ui/icons/Send";
 import Alert from "@material-ui/lab/Alert";
 import DeleteForeverIcon from "@material-ui/icons/DeleteForever";
@@ -27,7 +24,8 @@ import axios from "axios";
 import lodash from "lodash";
 import ChatModal from "../../components/chat.js";
 import Cookies from "universal-cookie";
-import { getRandomColor } from "../../utils";
+
+const LoadProfileCards = lazy(() => import("./profileCard"));
 
 const cookies = new Cookies();
 
@@ -40,35 +38,11 @@ const useStyles = (theme) => ({
   },
 });
 
-const cardImgStyle = {
-  width: "20%",
-  height: "20%",
-  borderRadius: "50%",
-  display: "flex",
-  float: "right",
-};
-
 const divStyle = {
   display: "flex",
   flexDirection: "row",
   flexWrap: "wrap",
   alignContent: "space-between",
-};
-
-const cardStyle = {
-  width: "25rem",
-  marginRight: "25px",
-  marginTop: "10px",
-  marginBottom: "10px",
-  borderRadius: "10%",
-  borderColor: "orange",
-};
-
-const buttonStyle = {
-  marginRight: "5px",
-  marginTop: "2px",
-  marginBottom: "2px",
-  borderRadius: "10%",
 };
 
 const deleteBtnStyle = { backgroundColor: "red" };
@@ -234,7 +208,6 @@ class TableList extends Component {
     this.onEmailSubmit = this.onEmailSubmit.bind(this);
     this.getEncryptedPayload = this.getEncryptedPayload.bind(this);
     this.getEncryptedValue = this.getEncryptedValue.bind(this);
-    this.getDefaultPicture = this.getDefaultPicture.bind(this);
   }
 
   onChange(event) {
@@ -296,23 +269,6 @@ class TableList extends Component {
       result = exc?.response;
     }
     this.setState({ is_admin: result.data.values[0] });
-  }
-
-  async getDefaultPicture(username) {
-    var [firstname, lastname] = lodash.split(username, " ");
-    const queryString = `background=${getRandomColor()}&color=fff&name=${firstname}+${lastname}&size=120`;
-    const avatar_options = {
-      method: "GET",
-      url: `https://ui-avatars.com/api/?${queryString}`,
-      responseType: "arraybuffer",
-      timeout: 10 * 1000,
-    };
-    var avatarResult = await axios(avatar_options);
-    var profile_image = Buffer.from(avatarResult.data, "binary").toString(
-      "base64"
-    );
-    profile_image = `data:image/png;base64,${profile_image}`;
-    return profile_image;
   }
 
   async ProcessAndGetUsers() {
@@ -379,81 +335,18 @@ class TableList extends Component {
   async GetUserData() {
     await this.ProcessAndGetUsers();
     var userData = this.state.clients;
-    for (var data of userData) {
-      if (!data.image) {
-        data["image"] = await this.getDefaultPicture(data.name);
-      }
-    }
     const { classes } = this.props;
     var users_list_component = userData.map((data) => {
       return (
-        <div key={data.email}>
-          <Card style={cardStyle}>
-            <Card.Body>
-              <div className={{ position: "absolute" }}>
-                <img
-                  className={classes.img}
-                  style={cardImgStyle}
-                  src={data.image}
-                  alt="sans"
-                />
-                <Card.Title> {data.name} </Card.Title>
-              </div>
-              <Card.Subtitle className="mb-2 text-muted">
-                General Manager
-              </Card.Subtitle>
-              <Card.Text>{data.email}</Card.Text>
-              <ThemeProvider theme={ButtonTheme}>
-                <Button
-                  variant="contained"
-                  className={classes.button}
-                  startIcon={<DeleteIcon />}
-                  style={{ ...buttonStyle, ...deleteBtnStyle }}
-                  onClick={() => {
-                    this.setState({ DeleteModalShow: true });
-                    this.setState({ user_of_activated_modal: data.email });
-                    this.setState({ username_of_activated_modal: data.name });
-                  }}
-                >
-                  Delete
-                </Button>
-              </ThemeProvider>
-              <ThemeProvider theme={ButtonTheme}>
-                <Button
-                  variant="contained"
-                  color="primary"
-                  className={classes.button}
-                  startIcon={<EmailIcon />}
-                  style={buttonStyle}
-                  onClick={() => {
-                    this.setState({ EmailModalShow: true });
-                    this.setState({ user_of_activated_modal: data.email });
-                    this.setState({ username_of_activated_modal: data.name });
-                  }}
-                >
-                  Email
-                </Button>
-              </ThemeProvider>
-              <ThemeProvider theme={ButtonTheme}>
-                <Button
-                  variant="contained"
-                  color="secondary"
-                  className={classes.button}
-                  startIcon={<ChatIcon />}
-                  style={buttonStyle}
-                  onClick={() => {
-                    this.setState({ ChatModalShow: true });
-                    this.setState({ user_of_activated_modal: data.email });
-                    this.setState({ username_of_activated_modal: data.name });
-                    this.setState({ image_of_activated_modal: data.image });
-                  }}
-                >
-                  Chat
-                </Button>
-              </ThemeProvider>
-            </Card.Body>
-          </Card>
-        </div>
+        <Suspense fallback={<div>Loading...</div>}>
+          <div key={data.email}>
+            <LoadProfileCards
+              classes={classes}
+              data={data}
+              setState={this.setState}
+            />
+          </div>
+        </Suspense>
       );
     });
     this.setState({
