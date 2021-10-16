@@ -18,14 +18,15 @@ import styles from "../../assets/jss/material-dashboard-react/components/sidebar
 
 const useStyles = makeStyles(styles);
 
+import crmlogo from "../../assets/CRM.jpg";
+
 export default function Sidebar(props) {
   const classes = useStyles();
   let location = useLocation();
-  // verifies if routeName is the one active (in browser input)
   function activeRoute(routeName) {
     return location.pathname === routeName;
   }
-  const { color, logo, image, logoText, routes } = props;
+  const { color, image, routes } = props;
   var links = (
     <List className={classes.list}>
       {routes.map((prop, key) => {
@@ -53,25 +54,15 @@ export default function Sidebar(props) {
           >
             <ListItem button className={classes.itemLink + listItemClasses}>
               {typeof prop.icon === "string" ? (
-                <Icon
-                  className={classNames(classes.itemIcon, whiteFontClasses, {
-                    [classes.itemIconRTL]: props.rtlActive,
-                  })}
-                >
+                <Icon className={classNames(classes.itemIcon, whiteFontClasses)}>
                   {prop.icon}
                 </Icon>
               ) : (
-                <prop.icon
-                  className={classNames(classes.itemIcon, whiteFontClasses, {
-                    [classes.itemIconRTL]: props.rtlActive,
-                  })}
-                />
+                <prop.icon className={classNames(classes.itemIcon, whiteFontClasses)}/>
               )}
               <ListItemText
-                primary={props.rtlActive ? prop.rtlName : prop.name}
-                className={classNames(classes.itemText, whiteFontClasses, {
-                  [classes.itemTextRTL]: props.rtlActive,
-                })}
+                primary={prop.name}
+                className={classNames(classes.itemText, whiteFontClasses)}
                 disableTypography={true}
               />
             </ListItem>
@@ -82,18 +73,9 @@ export default function Sidebar(props) {
   );
   var brand = (
     <div className={classes.logo}>
-      <a
-        href="https://github.com/AbinashB1997/CRM"
-        className={classNames(classes.logoLink, {
-          [classes.logoLinkRTL]: props.rtlActive,
-        })}
-        target="_blank"
-      >
-        <div className={classes.logoImage}>
-          <img src={logo} alt="logo" className={classes.img} />
-        </div>
-        {logoText}
-      </a>
+      <div className={classes.logoImage}>
+        <img src={crmlogo} alt="logo" className={classes.img} />
+      </div>
     </div>
   );
   return (
@@ -101,7 +83,7 @@ export default function Sidebar(props) {
       <Hidden mdUp implementation="css">
         <Drawer
           variant="temporary"
-          anchor={props.rtlActive ? "left" : "right"}
+          anchor={"right"}
           open={props.open}
           classes={{
             paper: classNames(classes.drawerPaper, {
@@ -118,17 +100,11 @@ export default function Sidebar(props) {
             <AdminNavbarLinks />
             {links}
           </div>
-          {image !== undefined ? (
-            <div
-              className={classes.background}
-              style={{ backgroundImage: "url(" + image + ")" }}
-            />
-          ) : null}
         </Drawer>
       </Hidden>
       <Hidden smDown implementation="css">
         <Drawer
-          anchor={props.rtlActive ? "right" : "left"}
+          anchor={"left"}
           variant="permanent"
           open
           classes={{
@@ -142,7 +118,7 @@ export default function Sidebar(props) {
           {image !== undefined ? (
             <div
               className={classes.background}
-              style={{ backgroundImage: "url(" + image + ")" }}
+              style={{ background: "#FFFAF0" }}
             />
           ) : null}
         </Drawer>

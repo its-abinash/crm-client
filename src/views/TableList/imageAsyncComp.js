@@ -1,53 +1,62 @@
-import { useState } from "react";
+import { useState, lazy, Suspense } from "react";
 import Card from "react-bootstrap/Card";
 import lodash from "lodash";
-import axios from "axios";
 
-const cardImgStyle = {
-  width: "20%",
-  height: "20%",
-  borderRadius: "50%",
-  display: "flex",
-  float: "right",
-};
+const LoadAvatar = lazy(() => import("../../components/Avatar"));
 
-async function getDefaultPicture(username) {
-  var [firstname, lastname] = lodash.split(username, " ");
-  const queryString = `background=B0E0E6&color=0000CD&name=${firstname}+${lastname}&size=120`;
-  const avatar_options = {
+async function get_user_image(userId, headers, callback) {
+  const URL = `http://localhost:3001/user/${userId}`;
+  const options = {
     method: "GET",
-    url: `https://ui-avatars.com/api/?${queryString}`,
-    responseType: "arraybuffer",
-    timeout: 10 * 1000,
+    url: URL,
+    timeout: 60 * 1000,
+    headers: headers,
   };
-  var avatarResult = await axios(avatar_options);
-  var profile_image = Buffer.from(avatarResult.data, "binary").toString(
-    "base64"
-  );
-  profile_image = `data:image/png;base64,${profile_image}`;
+  var result = await callback(options);
+  var values = result.data.values[0];
+  var profile_image = lodash.has(values, "media.image")
+    ? values.media.image
+    : null;
   return profile_image;
 }
 
 var LoadImage = function (props) {
-  var { classes, image, name } = props;
-  var [profileImage, setProfileImg] = useState(null);
-  if (!image) {
-    getDefaultPicture(name).then((profileImage) => {
-      setProfileImg(profileImage);
-    });
+  var { image, name, userId, headers, callback, isChatAvatar, loggedInUser } =
+    props;
+
+  var [profileImg, setProfileImg] = useState(null);
+  if (!image && headers) {
+    get_user_image(userId, headers, callback).then((profileImg) =>
+      setProfileImg(profileImg)
+    );
   }
-  if (profileImage != null) {
-    image = profileImage;
+
+  if (profileImg && !image) {
+    image = profileImg;
   }
+
+  if (isChatAvatar === true) {
+    return (
+      <Suspense fallback={<div>Loading...</div>}>
+        <LoadAvatar
+          name={userId.toUpperCase()}
+          data={image}
+          imgPos={loggedInUser ? "right" : "left"}
+        />
+      </Suspense>
+    );
+  }
+
   return (
     <div className={{ position: "absolute" }}>
-      <img
-        className={classes.img}
-        style={cardImgStyle}
-        src={image}
-        alt="sans"
-      />
-      <Card.Title> {name} </Card.Title>
+      <Suspense fallback={<div>Loading...</div>}>
+        <LoadAvatar
+          name={userId.toUpperCase()}
+          data={image}
+          isProfileCardAvatar={true}
+        />
+        <Card.Title> {name} </Card.Title>
+      </Suspense>
     </div>
   );
 };

@@ -1,4 +1,4 @@
-import React, { Component } from "react";
+import React, { Component, lazy, Suspense } from "react";
 import Modal from "react-bootstrap/Modal";
 import "../assets/css/chat.css";
 import { Form, Col } from "react-bootstrap";
@@ -13,11 +13,8 @@ import { cyan } from "@material-ui/core/colors";
 import axios from "axios";
 import clientSocket from "socket.io-client";
 import lodash from "lodash";
-import Cookies from "universal-cookie";
-import { getRandomColor } from "../utils";
 
-const cookies = new Cookies();
-
+const LoadChat = lazy(() => import("./lazyLoadChat"));
 const ButtonTheme = createMuiTheme({
   palette: {
     primary: cyan,
@@ -28,8 +25,7 @@ const ChatContainerStyle = {
   height: "450px",
   overflowX: "hidden",
   overflowY: "auto",
-  backgroundRepeat: `repeat`,
-  backgroundImage: `url("https://i.pinimg.com/originals/4a/96/e6/4a96e602750b8ef669a77565becf3939.gif")`,
+  backgroundColor: '#fff',
   backgroundBlendMode: "lighten",
 };
 
@@ -60,7 +56,6 @@ class ChatModal extends Component {
       this.getPrevChatDataCallOptions.bind(this);
     this.encryptKeyStable = this.encryptKeyStable.bind(this);
     this.loadChat = this.loadChat.bind(this);
-    this.getDefaultPicture = this.getDefaultPicture.bind(this);
   }
 
   async makeRequest(callOptions) {
@@ -90,6 +85,7 @@ class ChatModal extends Component {
       data: finalPayload,
     };
     this.makeRequest(callOptions);
+    this.setState({chat_message: ""});
   }
 
   onChange(event) {
@@ -119,28 +115,6 @@ class ChatModal extends Component {
     return callOptions;
   }
 
-  async getDefaultPicture(username) {
-    var image_from_cookies = cookies.get(`user_${this.props.user}_image`);
-    if (image_from_cookies) {
-      return image_from_cookies;
-    }
-    var [firstname, lastname] = lodash.split(username, " ");
-    const queryString = `background=${getRandomColor()}&color=fff&name=${firstname}+${lastname}&size=120`;
-    const avatar_options = {
-      method: "GET",
-      url: `https://ui-avatars.com/api/?${queryString}`,
-      responseType: "arraybuffer",
-      timeout: 10 * 1000,
-    };
-    var avatarResult = await this.makeRequest(avatar_options);
-    var profile_image = Buffer.from(avatarResult.data, "binary").toString(
-      "base64"
-    );
-    profile_image = `data:image/png;base64,${profile_image}`;
-    cookies.set(`user_${this.props.user}_image`, String(profile_image));
-    return profile_image;
-  }
-
   async loadChat() {
     var callOptions = this.getPrevChatDataCallOptions();
     if (lodash.isEmpty(callOptions)) {
@@ -154,34 +128,29 @@ class ChatModal extends Component {
       "timestamp"
     );
     var messages = lodash.sortBy(unionOfCommonReceivedMessages, ["timestamp"]);
-    for (var message of messages) {
-      if (!message.image) {
-        message["image"] = await this.getDefaultPicture(this.props.username);
-      }
-    }
     var chatComp = messages.map((data, index) => {
       return (
-        <div key={index}>
+        <Suspense fallback={<div>Loading...</div>} key={index}>
           {data.sender === this.props.user && (
-            <div className="container">
-              <img src={data.image} alt="Avatar" className="right" />
-              <p style={{ textAlign: "left" }}>{data.chatmsg}</p>
-              <span className="time-left">
-                {new Date(data.timestamp).toLocaleString()}
-              </span>
-            </div>
+            <LoadChat
+              data={data}
+              userid={data.sender}
+              loggedInUser={false}
+              headers={this.props.get_headers()}
+              callback={this.makeRequest}
+            />
           )}
           {data.sender === this.props.logged_in_user &&
             data.receiver === this.props.user && (
-              <div className="container darker">
-                <img src={this.props.image} alt="Avatar" />
-                <p style={{ textAlign: "right" }}>{data.chatmsg}</p>
-                <span className="time-right">
-                  {new Date(data.timestamp).toLocaleString()}
-                </span>
-              </div>
+              <LoadChat
+                data={data}
+                userid={data.sender}
+                loggedInUser={true}
+                headers={this.props.get_headers()}
+                callback={this.makeRequest}
+              />
             )}
-        </div>
+        </Suspense>
       );
     });
     this.setState({ chat_comp: chatComp });
@@ -266,6 +235,7 @@ class ChatModal extends Component {
                       color="primary"
                       startIcon={<SendIcon />}
                       onClick={this.sendChat}
+                      disabled={lodash.isEmpty(this.state.chat_message)}
                     >
                       Send
                     </Button>

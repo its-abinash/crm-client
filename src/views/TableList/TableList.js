@@ -338,14 +338,27 @@ class TableList extends Component {
     const { classes } = this.props;
     var users_list_component = userData.map((data) => {
       return (
-        <Suspense fallback={<div>Loading...</div>}>
-          <div key={data.email}>
-            <LoadProfileCards
-              classes={classes}
-              data={data}
-              setState={this.setState}
-            />
-          </div>
+        <Suspense fallback={<div>Loading...</div>} key={data.email}>
+          <LoadProfileCards
+            classes={classes}
+            data={data}
+            onClickChatBtn={() => {
+              this.setState({ ChatModalShow: true });
+              this.setState({ user_of_activated_modal: data.email });
+              this.setState({ username_of_activated_modal: data.name });
+              this.setState({ image_of_activated_modal: data.image });
+            }}
+            onClickEmailBtn={() => {
+              this.setState({ EmailModalShow: true });
+              this.setState({ user_of_activated_modal: data.email });
+              this.setState({ username_of_activated_modal: data.name });
+            }}
+            onClickDeleteBtn={() => {
+              this.setState({ DeleteModalShow: true });
+              this.setState({ user_of_activated_modal: data.email });
+              this.setState({ username_of_activated_modal: data.name });
+            }}
+          />
         </Suspense>
       );
     });
