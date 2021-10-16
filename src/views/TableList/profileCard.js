@@ -35,12 +35,17 @@ const ButtonTheme = createMuiTheme({
 const deleteBtnStyle = { backgroundColor: "red" };
 
 var LoadProfileCard = function (props) {
-  var { classes, data, setState } = props;
+  var { classes, data } = props;
   return (
     <Card style={cardStyle}>
       <Card.Body>
         <Suspense fallback={<div>Loading...</div>}>
-          <LoadImage classes={classes} image={data.image} name={data.name} />
+          <LoadImage
+            classes={classes}
+            image={data.image}
+            name={data.name}
+            userId={data.email}
+          />
         </Suspense>
         <Card.Subtitle className="mb-2 text-muted">
           General Manager
@@ -52,11 +57,7 @@ var LoadProfileCard = function (props) {
             className={classes.button}
             startIcon={<DeleteIcon />}
             style={{ ...buttonStyle, ...deleteBtnStyle }}
-            onClick={() => {
-              setState({ DeleteModalShow: true });
-              setState({ user_of_activated_modal: data.email });
-              setState({ username_of_activated_modal: data.name });
-            }}
+            onClick={() => props.onClickDeleteBtn()}
           >
             Delete
           </Button>
@@ -68,11 +69,7 @@ var LoadProfileCard = function (props) {
             className={classes.button}
             startIcon={<EmailIcon />}
             style={buttonStyle}
-            onClick={() => {
-              setState({ EmailModalShow: true });
-              setState({ user_of_activated_modal: data.email });
-              setState({ username_of_activated_modal: data.name });
-            }}
+            onClick={() => props.onClickEmailBtn()}
           >
             Email
           </Button>
@@ -84,12 +81,7 @@ var LoadProfileCard = function (props) {
             className={classes.button}
             startIcon={<ChatIcon />}
             style={buttonStyle}
-            onClick={() => {
-              setState({ ChatModalShow: true });
-              setState({ user_of_activated_modal: data.email });
-              setState({ username_of_activated_modal: data.name });
-              setState({ image_of_activated_modal: data.image });
-            }}
+            onClick={() => props.onClickChatBtn()}
           >
             Chat
           </Button>

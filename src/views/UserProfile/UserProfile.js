@@ -25,7 +25,7 @@ import SelectDropdown from "../../hooks/select.js";
 import lodash from "lodash";
 import axios from "axios";
 import { REMAINDER_FREQUENCY_SLIDER_MARKS } from "../../constants/constants.js";
-import { getRandomColor } from "../../utils";
+import Avatar from "../../components/Avatar";
 
 var cardCategoryWhite = {
   color: "rgba(255,255,255,.62)",
@@ -451,25 +451,8 @@ class UserProfile extends Component {
     var profile_image = lodash.has(values, "media.image")
       ? values.media.image
       : null;
-    // var lastUpdated = lodash.has(values, "media.type") ? values.media.type : null;
     var username = lodash.has(values, "name") ? values.name : null;
     var phone = lodash.has(values, "phone") ? values.phone : null;
-    var firstname = lodash.has(values, "firstname") ? values.firstname : null;
-    var lastname = lodash.has(values, "lastname") ? values.lastname : null;
-    if (!profile_image) {
-      const queryString = `background=${getRandomColor()}&color=fff&name=${firstname}+${lastname}&size=120`;
-      const avatar_options = {
-        method: "GET",
-        url: `https://ui-avatars.com/api/?${queryString}`,
-        responseType: "arraybuffer",
-        timeout: 10 * 1000,
-      };
-      var avatarResult = await this.makeRequest(avatar_options);
-      profile_image = Buffer.from(avatarResult.data, "binary").toString(
-        "base64"
-      );
-      profile_image = `data:image/png;base64,${profile_image}`;
-    }
     this.setState({
       profile_image: profile_image,
       name: username,
@@ -710,10 +693,11 @@ class UserProfile extends Component {
                   onMouseOver={() => this.setState({ mouse_on_image: true })}
                   onMouseLeave={() => this.setState({ mouse_on_image: false })}
                 >
-                  <img
-                    style={{ opacity: this.state.mouse_on_image ? "0" : "1" }}
-                    src={this.state.profile_image}
-                    alt="profile_picture"
+                  <Avatar
+                    name={this.state.email.toUpperCase()}
+                    data={this.state.profile_image}
+                    mouse_on_image={this.state.mouse_on_image}
+                    isOwnProfile={true}
                   />
                   {this.state.mouse_on_image && (
                     <div
