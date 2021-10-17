@@ -49,6 +49,7 @@ export default function GetAvatar(props) {
     float: "right",
     width: 56,
     height: 56,
+    backgroundColor: stringToColor(name),
   };
 
   if (isOwnProfile && data) {
