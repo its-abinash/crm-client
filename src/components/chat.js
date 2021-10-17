@@ -25,7 +25,7 @@ const ChatContainerStyle = {
   height: "450px",
   overflowX: "hidden",
   overflowY: "auto",
-  backgroundColor: '#fff',
+  backgroundColor: "#fff",
   backgroundBlendMode: "lighten",
 };
 
@@ -85,7 +85,7 @@ class ChatModal extends Component {
       data: finalPayload,
     };
     this.makeRequest(callOptions);
-    this.setState({chat_message: ""});
+    this.setState({ chat_message: "" });
   }
 
   onChange(event) {
@@ -189,7 +189,9 @@ class ChatModal extends Component {
           </Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          <div style={ChatContainerStyle}>{this.state.chat_comp}</div>
+          <div style={ChatContainerStyle} className="chatbox">
+            {this.state.chat_comp}
+          </div>
           <div>
             <Form>
               <Form.Row className="align-items-center">

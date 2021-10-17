@@ -24,8 +24,10 @@ import axios from "axios";
 import lodash from "lodash";
 import ChatModal from "../../components/chat.js";
 import Cookies from "universal-cookie";
+import spinner from "../../assets/loading.gif";
 
 const LoadProfileCards = lazy(() => import("./profileCard"));
+const SearchBox = lazy(() => import("./searchBox"));
 
 const cookies = new Cookies();
 
@@ -42,7 +44,17 @@ const divStyle = {
   display: "flex",
   flexDirection: "row",
   flexWrap: "wrap",
-  alignContent: "space-between",
+  alignContent: "flex-start",
+  scroll: "auto",
+  overflowX: "hidden",
+  overflowY: "auto",
+  height: window.innerHeight,
+};
+
+const loadingIconDiv = {
+  display: "block",
+  textAlign: "center",
+  height: window.innerHeight,
 };
 
 const deleteBtnStyle = { backgroundColor: "red" };
@@ -180,7 +192,7 @@ class TableList extends Component {
   constructor(props) {
     super(props);
     this.state = {
-      is_admin: false,
+      is_admin: "",
       ShowNotifications: false,
       DeleteModalShow: false,
       EmailModalShow: false,
@@ -257,6 +269,9 @@ class TableList extends Component {
   }
 
   async GetUserType() {
+    if (!lodash.isEmpty(this.state.is_admin)) {
+      return;
+    }
     const options = {
       method: "GET",
       url: "http://localhost:3001/getUserType",
@@ -268,15 +283,20 @@ class TableList extends Component {
     } catch (exc) {
       result = exc?.response;
     }
-    this.setState({ is_admin: result.data.values[0] });
+    this.setState({ is_admin: result.data.values[0] ? "true" : "false" });
   }
 
-  async ProcessAndGetUsers() {
+  async ProcessAndGetUsers(searchText) {
     await this.GetUserType();
-    var finalRoute = this.state.is_admin ? "/getCustomer" : "/getAdmins";
+    var userType = this.state.is_admin === "true" ? false : true;
+    const qpArgs = this.getEncryptedValue(
+      `admin=${userType}&searchText=${searchText}`,
+      "#"
+    );
+    const URL = `http://localhost:3001/dashboard/users?${qpArgs}`;
     const options = {
       method: "GET",
-      url: "http://localhost:3001/dashboard" + finalRoute,
+      url: URL,
       timeout: 60 * 1000,
       headers: this.GetHeaders(),
     };
@@ -294,7 +314,7 @@ class TableList extends Component {
       return;
     }
     this.setState({
-      clients: this.state.clients.concat(result.data.values),
+      clients: result.data.values,
     });
   }
 
@@ -332,8 +352,8 @@ class TableList extends Component {
     }
   }
 
-  async GetUserData() {
-    await this.ProcessAndGetUsers();
+  async GetUserData(searchText) {
+    await this.ProcessAndGetUsers(searchText);
     var userData = this.state.clients;
     const { classes } = this.props;
     var users_list_component = userData.map((data) => {
@@ -363,63 +383,78 @@ class TableList extends Component {
       );
     });
     this.setState({
-      users_component: this.state.users_component.concat(users_list_component),
+      users_component: users_list_component,
+      loading: "false",
     });
   }
 
   componentDidMount() {
-    this.GetUserData();
+    this.setState({ loading: "true" })
+    this.GetUserData(""); // Empty searchText represents to get all users for the loggedInUser
   }
 
   render() {
     return (
-      <div style={divStyle}>
-        {this.state.users_component}
-        <EmailModal
-          loadingicon={this.state.loading}
-          onSubmit={this.onEmailSubmit}
-          subject={this.state.email_subject}
-          body={this.state.email_body}
-          onChange={this.onChange}
-          user={this.state.user_of_activated_modal}
-          username={this.state.username_of_activated_modal}
-          show={this.state.EmailModalShow}
-          onHide={() => this.setState({ EmailModalShow: false })}
-        />
-        <ChatModal
-          user={this.state.user_of_activated_modal}
-          username={this.state.username_of_activated_modal}
-          logged_in_user={this.state.logged_in_user}
-          image={this.state.image_of_activated_modal}
-          show={this.state.ChatModalShow}
-          get_headers={this.GetHeaders}
-          get_encrypted_value={this.getEncryptedValue}
-          get_encrypted_payload={this.getEncryptedPayload}
-          get_decrypted_key={this.DecryptKey}
-          onHide={() => this.setState({ ChatModalShow: false })}
-        />
-        <DeleteModal
-          user={this.state.user_of_activated_modal}
-          username={this.state.username_of_activated_modal}
-          show={this.state.DeleteModalShow}
-          onChange={this.onChange}
-          isChecked={this.state.isChecked}
-          onHide={() => this.setState({ DeleteModalShow: false })}
-        />
-        {this.state.ShowNotifications ? (
-          <Snackbar
-            color={this.state.response_status}
-            icon={IconMap[this.state.response_status]}
-            message={this.state.response_message}
-            open={this.state.ShowNotifications}
-            closeNotification={() =>
-              this.setState({ ShowNotifications: false })
-            }
-            close
+      <div>
+        <Suspense fallback={<div>Loading...</div>}>
+          <SearchBox
+            callback={this}
+            onChange={() => this.setState({ loading: "true" })}
           />
-        ) : (
-          ""
+        </Suspense>
+        {this.state.loading === "true" && (
+          <div style={loadingIconDiv}>
+            <img src={spinner} alt="loading..." />
+          </div>
         )}
+        <div style={divStyle}>
+          {this.state.users_component}
+          <EmailModal
+            loadingicon={this.state.loading}
+            onSubmit={this.onEmailSubmit}
+            subject={this.state.email_subject}
+            body={this.state.email_body}
+            onChange={this.onChange}
+            user={this.state.user_of_activated_modal}
+            username={this.state.username_of_activated_modal}
+            show={this.state.EmailModalShow}
+            onHide={() => this.setState({ EmailModalShow: false })}
+          />
+          <ChatModal
+            user={this.state.user_of_activated_modal}
+            username={this.state.username_of_activated_modal}
+            logged_in_user={this.state.logged_in_user}
+            image={this.state.image_of_activated_modal}
+            show={this.state.ChatModalShow}
+            get_headers={this.GetHeaders}
+            get_encrypted_value={this.getEncryptedValue}
+            get_encrypted_payload={this.getEncryptedPayload}
+            get_decrypted_key={this.DecryptKey}
+            onHide={() => this.setState({ ChatModalShow: false })}
+          />
+          <DeleteModal
+            user={this.state.user_of_activated_modal}
+            username={this.state.username_of_activated_modal}
+            show={this.state.DeleteModalShow}
+            onChange={this.onChange}
+            isChecked={this.state.isChecked}
+            onHide={() => this.setState({ DeleteModalShow: false })}
+          />
+          {this.state.ShowNotifications ? (
+            <Snackbar
+              color={this.state.response_status}
+              icon={IconMap[this.state.response_status]}
+              message={this.state.response_message}
+              open={this.state.ShowNotifications}
+              closeNotification={() =>
+                this.setState({ ShowNotifications: false })
+              }
+              close
+            />
+          ) : (
+            ""
+          )}
+        </div>
       </div>
     );
   }

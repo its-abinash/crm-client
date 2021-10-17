@@ -11,7 +11,7 @@ const LoadImage = lazy(() => import("./imageAsyncComp"));
 
 const cardStyle = {
   width: "25rem",
-  marginRight: "25px",
+  marginRight: "auto",
   marginTop: "10px",
   marginBottom: "10px",
   borderRadius: "10%",
