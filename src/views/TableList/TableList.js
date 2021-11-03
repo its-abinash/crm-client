@@ -1,4 +1,5 @@
 import { lazy, Suspense } from "react";
+import { pushNotification } from "../../components/Snackbar/toastUtils";
 import Modal from "react-bootstrap/Modal";
 import Form from "react-bootstrap/Form";
 import Col from "react-bootstrap/Col";
@@ -7,12 +8,8 @@ import SendIcon from "@material-ui/icons/Send";
 import Alert from "@material-ui/lab/Alert";
 import DeleteForeverIcon from "@material-ui/icons/DeleteForever";
 import AlertTitle from "@material-ui/lab/AlertTitle";
-import CheckCircleSharpIcon from "@material-ui/icons/CheckCircleSharp";
-import ErrorOutlineSharpIcon from "@material-ui/icons/ErrorOutlineSharp";
 import Button from "@material-ui/core/Button";
 import CircularProgress from "@material-ui/core/CircularProgress";
-import HttpsIcon from "@material-ui/icons/HttpsOutlined";
-import Snackbar from "../../components/Snackbar/Snackbar.js";
 import {
   withStyles,
   ThemeProvider,
@@ -65,12 +62,6 @@ const ButtonTheme = createMuiTheme({
     secondary: blue,
   },
 });
-
-const IconMap = {
-  success: CheckCircleSharpIcon,
-  danger: ErrorOutlineSharpIcon,
-  warning: HttpsIcon,
-};
 
 function EmailModal(props) {
   return (
@@ -193,13 +184,11 @@ class TableList extends Component {
     super(props);
     this.state = {
       is_admin: "",
-      ShowNotifications: false,
       DeleteModalShow: false,
       EmailModalShow: false,
       user_of_activated_modal: "",
       username_of_activated_modal: "",
-      image_of_activated_modal:
-        "https://www.w3schools.com/howto/img_avatar.png",
+      image_of_activated_modal: null,
       ChatModalShow: false,
       clients: [],
       users_component: [],
@@ -208,8 +197,6 @@ class TableList extends Component {
       email_subject: "",
       email_body: "",
       loading: "false",
-      response_status: "",
-      response_message: "",
       isChecked: false,
     };
     this.DecryptKey = this.DecryptKey.bind(this);
@@ -220,6 +207,7 @@ class TableList extends Component {
     this.onEmailSubmit = this.onEmailSubmit.bind(this);
     this.getEncryptedPayload = this.getEncryptedPayload.bind(this);
     this.getEncryptedValue = this.getEncryptedValue.bind(this);
+    this.showNotification = this.showNotification.bind(this);
   }
 
   onChange(event) {
@@ -252,7 +240,7 @@ class TableList extends Component {
       var obj = JSON.parse(utf8String);
       return obj;
     } catch (exc) {
-      return utf8String;
+      return utf8String || key;
     }
   }
 
@@ -306,11 +294,7 @@ class TableList extends Component {
       result = exc?.response;
     }
     if (result.data.statusCode === 401) {
-      this.setState({ response_status: "danger" });
-      this.setState({ ShowNotifications: true });
-      this.setState({
-        response_message: "You are not authorized to access this page",
-      });
+      this.showNotification("error", "You are not authorized to access this page");
       return;
     }
     this.setState({
@@ -337,18 +321,10 @@ class TableList extends Component {
     };
     try {
       var result = await axios(callOptions);
-      this.setState({
-        response_status: "success",
-        response_message: result.data.reasons[0],
-        ShowNotifications: true,
-      });
+      this.showNotification("success", result.data.reasons[0]);
     } catch (exc) {
       result = exc?.response;
-      this.setState({
-        response_status: "danger",
-        response_message: result.data.reasons[0],
-        ShowNotifications: true,
-      });
+      this.showNotification("error", result.data.reasons[0]);
     }
   }
 
@@ -391,6 +367,13 @@ class TableList extends Component {
   componentDidMount() {
     this.setState({ loading: "true" })
     this.GetUserData(""); // Empty searchText represents to get all users for the loggedInUser
+  }
+
+  showNotification(notificationType, message) {
+    pushNotification({
+      type: notificationType,
+      message: message,
+    });
   }
 
   render() {
@@ -440,20 +423,6 @@ class TableList extends Component {
             isChecked={this.state.isChecked}
             onHide={() => this.setState({ DeleteModalShow: false })}
           />
-          {this.state.ShowNotifications ? (
-            <Snackbar
-              color={this.state.response_status}
-              icon={IconMap[this.state.response_status]}
-              message={this.state.response_message}
-              open={this.state.ShowNotifications}
-              closeNotification={() =>
-                this.setState({ ShowNotifications: false })
-              }
-              close
-            />
-          ) : (
-            ""
-          )}
         </div>
       </div>
     );

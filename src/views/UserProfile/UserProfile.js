@@ -1,4 +1,5 @@
 import React, { Component } from "react";
+import { pushNotification } from "../../components/Snackbar/toastUtils";
 import GridItem from "../../components/Grid/GridItem.js";
 import GridContainer from "../../components/Grid/GridContainer.js";
 import Card from "../../components/Card/Card.js";
@@ -13,11 +14,7 @@ import CardFooter from "../../components/Card/CardFooter.js";
 import ClearRoundedIcon from "@material-ui/icons/ClearRounded";
 import CheckRoundedIcon from "@material-ui/icons/CheckRounded";
 import Slider from "@material-ui/core/Slider";
-import CheckCircleSharpIcon from "@material-ui/icons/CheckCircleSharp";
-import ErrorOutlineSharpIcon from "@material-ui/icons/ErrorOutlineSharp";
 import UpdateRoundedIcon from "@material-ui/icons/UpdateRounded";
-import HttpsIcon from "@material-ui/icons/HttpsOutlined";
-import Snackbar from "../../components/Snackbar/Snackbar.js";
 import { Col, Form, Row } from "react-bootstrap";
 import Cookies from "universal-cookie";
 import { AES, enc } from "crypto-js";
@@ -52,12 +49,6 @@ var PhoneNumFlexBox = {
   alignContent: "space-between",
 };
 
-const IconMap = {
-  success: CheckCircleSharpIcon,
-  danger: ErrorOutlineSharpIcon,
-  warning: HttpsIcon,
-};
-
 const cookies = new Cookies();
 
 class UserProfile extends Component {
@@ -84,7 +75,6 @@ class UserProfile extends Component {
       has_length_more_than_decided: false,
       phone_number: "",
       countryCode: "",
-      ShowNotifications: false,
       response_status: "danger",
       response_message: "",
       mouse_on_image: false,
@@ -106,6 +96,7 @@ class UserProfile extends Component {
     this.get_user_data = this.get_user_data.bind(this);
     this.readImage = this.readImage.bind(this);
     this.deleteProfilePicture = this.deleteProfilePicture.bind(this);
+    this.showNotification = this.showNotification.bind(this);
   }
 
   onChange(event) {
@@ -217,21 +208,19 @@ class UserProfile extends Component {
     var qpArgString = `email=${this.state.email}&`;
     if (payload && payload.profile) {
       if (payload.profile.name) {
-        qpArgString += `name=${this.DecryptKey(payload.profile.name)}&`;
+        qpArgString += `name=${payload.profile.name}&`;
       }
       if (payload.profile.phone) {
-        qpArgString += `phone=${this.DecryptKey(payload.profile.phone)}&`;
+        qpArgString += `phone=${payload.profile.phone}&`;
       }
       if (payload.profile.remainder_freq) {
-        qpArgString += `remainder_freq=${this.DecryptKey(
-          payload.profile.remainder_freq
-        )}&`;
+        qpArgString += `remainder_freq=${payload.profile.remainder_freq}&`;
       }
       if (payload.profile.password) {
-        qpArgString += `password=${this.DecryptKey(payload.profile.password)}&`;
+        qpArgString += `password=${payload.profile.password}&`;
       }
       if (payload.profile.passcode) {
-        qpArgString += `passcode=${this.DecryptKey(payload.profile.passcode)}&`;
+        qpArgString += `passcode=${payload.profile.passcode}&`;
       }
     }
     if (payload && payload.media) {
@@ -266,11 +255,7 @@ class UserProfile extends Component {
     event.preventDefault();
     var allPropertiesValidated = this.verifyInputPropertiesAndReport();
     if (!allPropertiesValidated) {
-      this.setState({
-        ShowNotifications: true,
-        response_status: "danger",
-        response_message: "Please enter valid information to update profile",
-      });
+      this.showNotification("error", "Please enter valid information to update profile");
       return;
     }
     var profile = {};
@@ -311,22 +296,13 @@ class UserProfile extends Component {
         this.setState({ new_profile_picture_data: data });
         media["profile_picture"] = imageUri;
       } catch (exc) {
-        this.setState({
-          ShowNotifications: true,
-          response_status: "error",
-          response_message:
-            "Not able to process selected image.\nPlease try to upload a valid image file.",
-        });
+        this.showNotification("error", "Not able to process selected image.\nPlease try to upload a valid image file.");
       }
     }
     var finalPayload = {},
       payload = {};
     if (lodash.isEmpty(profile) && lodash.isEmpty(media)) {
-      this.setState({
-        ShowNotifications: true,
-        response_status: "warning",
-        response_message: "Please enter data to update",
-      });
+      this.showNotification("warning", "Please enter data to update");
       return;
     } else if (lodash.isEmpty(profile)) {
       payload["email"] = email;
@@ -349,28 +325,17 @@ class UserProfile extends Component {
       data: finalPayload,
     };
     var result = await this.makeRequest(options);
-    this.setState({ ShowNotifications: true });
     if (result && result.data) {
       if (result.data.statusCode === 200) {
-        this.setState({
-          response_message: result.data.reasons[0],
-          response_status: "success",
-        });
+        this.showNotification("success", result.data.reasons[0]);
         await this.get_user_data();
       } else {
         if (lodash.includes([400, 500, 502], result.data.statusCode)) {
-          this.setState({
-            response_message: result.data.reasons[0],
-            response_status: "danger",
-          });
+          this.showNotification("error", result.data.reasons[0]);
         }
       }
     } else {
-      this.setState({
-        response_message:
-          "Encountered error ocurred. Please try to reconnect to internet",
-        response_status: "danger",
-      });
+      this.showNotification("error", "Encountered error ocurred. Please try to reconnect to internet");
     }
   }
 
@@ -386,28 +351,17 @@ class UserProfile extends Component {
       headers: this.GetHeaders(),
     };
     var result = await this.makeRequest(options);
-    this.setState({ ShowNotifications: true });
     if (result && result.data) {
       if (result.data.statusCode === 200) {
-        this.setState({
-          response_message: result.data.reasons[0],
-          response_status: "success",
-        });
+        this.showNotification("success", result.data.reasons[0]);
         await this.get_user_data();
       } else {
         if (lodash.includes([400, 500, 502], result.data.statusCode)) {
-          this.setState({
-            response_message: result.data.reasons[0],
-            response_status: "danger",
-          });
+          this.showNotification("error", result.data.reasons[0]);
         }
       }
     } else {
-      this.setState({
-        response_message:
-          "Encountered error ocurred. Please try to reconnect to internet",
-        response_status: "danger",
-      });
+      this.showNotification("error", "Encountered error ocurred. Please try to reconnect to internet");
     }
   }
 
@@ -424,7 +378,7 @@ class UserProfile extends Component {
       var obj = JSON.parse(utf8String);
       return obj;
     } catch (exc) {
-      return utf8String;
+      return utf8String || key;
     }
   }
 
@@ -463,6 +417,13 @@ class UserProfile extends Component {
   componentDidMount() {
     this.processAndSaveCookiesInState();
     this.get_user_data();
+  }
+
+  showNotification(notificationType, message) {
+    pushNotification({
+      type: notificationType,
+      message: message,
+    });
   }
 
   render() {
@@ -737,20 +698,6 @@ class UserProfile extends Component {
             </Card>
           </GridItem>
         </GridContainer>
-        {this.state.ShowNotifications ? (
-          <Snackbar
-            color={this.state.response_status}
-            icon={IconMap[this.state.response_status]}
-            message={this.state.response_message}
-            open={this.state.ShowNotifications}
-            closeNotification={() =>
-              this.setState({ ShowNotifications: false })
-            }
-            close
-          />
-        ) : (
-          ""
-        )}
       </div>
     );
   }

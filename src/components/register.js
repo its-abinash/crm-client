@@ -1,19 +1,14 @@
 import React, { Component } from "react";
+import { pushNotification } from "./Snackbar/toastUtils";
 import "./index.css";
 import lodash from "lodash";
 import { AES } from "crypto-js";
 import axios from "axios";
-import CheckCircleSharpIcon from "@material-ui/icons/CheckCircleSharp";
-import ErrorOutlineSharpIcon from "@material-ui/icons/ErrorOutlineSharp";
-import Snackbar from "../components/Snackbar/Snackbar.js";
 
 class SignUp extends Component {
   constructor(props) {
     super(props);
     this.state = {
-      ShowNotifications: false,
-      response_message: "",
-      response_status: "danger",
       firstname: "",
       lastname: "",
       email: "",
@@ -24,6 +19,7 @@ class SignUp extends Component {
     this.onSignUpHit = this.onSignUpHit.bind(this);
     this.getEncryptedValue = this.getEncryptedValue.bind(this);
     this.getEncryptedPayload = this.getEncryptedPayload.bind(this);
+    this.showNotification = this.showNotification.bind(this);
   }
 
   onChange(event) {
@@ -75,17 +71,12 @@ class SignUp extends Component {
       if (statusCode >= 200 && statusCode < 300) {
         message = "Successfully Registered. Thank you for joining us!";
       }
-      this.setState({
-        ShowNotifications: true,
-        response_status:
-          statusCode >= 200 && statusCode < 300 ? "success" : "danger",
-        response_message: message,
-      });
+      this.showNotification(
+        statusCode >= 200 && statusCode < 300 ? "success" : "danger",
+        message
+      );
     } else {
-      this.setState({
-        response_status: "danger",
-        response_message: "Server is not reachable",
-      });
+      this.showNotification("error", "Server is not reachable");
     }
   }
 
@@ -155,28 +146,17 @@ class SignUp extends Component {
     this.getRegisterComponent();
   }
 
+  showNotification(notificationType, message) {
+    pushNotification({
+      type: notificationType,
+      message: message,
+    });
+  }
+
   render() {
     return (
       <>
         <div className="auth-wrapper"> {this.state.component} </div>
-        {this.state.ShowNotifications ? (
-          <Snackbar
-            color={this.state.response_status}
-            icon={
-              this.state.response_status === "success"
-                ? CheckCircleSharpIcon
-                : ErrorOutlineSharpIcon
-            }
-            message={this.state.response_message}
-            open={this.state.ShowNotifications}
-            closeNotification={() =>
-              this.setState({ ShowNotifications: false })
-            }
-            close
-          />
-        ) : (
-          ""
-        )}
       </>
     );
   }

@@ -1,8 +1,15 @@
 import React from "react";
 import "./bootstarp.min.css";
+import "react-toastify/dist/ReactToastify.css";
+import { ToastContainer } from "react-toastify";
 
 // import "./App.css";
-import { BrowserRouter as Router, Switch, Route, Redirect } from "react-router-dom";
+import {
+  BrowserRouter as Router,
+  Switch,
+  Route,
+  Redirect,
+} from "react-router-dom";
 
 import Login from "./components/login";
 import SignUp from "./components/register";
@@ -22,6 +29,7 @@ class App extends React.Component {
             <Redirect from="/admin" to="/admin/dashboard" />
           </Switch>
         </div>
+        <ToastContainer />
       </Router>
     );
   }
