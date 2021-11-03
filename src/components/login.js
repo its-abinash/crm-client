@@ -1,6 +1,4 @@
-import CheckCircleSharpIcon from "@material-ui/icons/CheckCircleSharp";
-import ErrorOutlineSharpIcon from "@material-ui/icons/ErrorOutlineSharp";
-import Snackbar from "../components/Snackbar/Snackbar.js";
+import { pushNotification } from "./Snackbar/toastUtils";
 import React, { Component } from "react";
 import "./index.css";
 import { AES } from "crypto-js";
@@ -15,18 +13,14 @@ class Login extends Component {
   constructor(props) {
     super(props);
     this.state = {
-      loginResponse: {},
       email: "",
       password: "",
-      userAuthorized: false,
-      ShowNotifications: false,
-      response_message: "",
-      response_status: "danger",
       login_component: null,
     };
     this.OnLoginHit = this.OnLoginHit.bind(this);
     this.onChange = this.onChange.bind(this);
     this.getLoginComponent = this.getLoginComponent.bind(this);
+    this.showNotification = this.showNotification.bind(this);
   }
 
   onChange(event) {
@@ -54,15 +48,13 @@ class Login extends Component {
     } catch (exc) {
       result = exc?.response;
     }
-    this.setState({ ShowNotifications: true });
+    var notificationType = "error";
+    var notificationMessage = "Server is not reachable";
     if (result && result.data) {
       if (result.data.statusCode === 200 && result.data.values[0].auth) {
-        this.setState({ loginResponse: result.data.values[0] });
-        this.setState({
-          response_status:
-            result.data.statusCode === 200 ? "success" : "danger",
-        });
-        this.setState({ response_message: result.data.reasons[0] });
+        notificationType = result.data.statusCode === 200 ? "success" : "error";
+        notificationMessage = result.data.reasons[0];
+        // Caching user data
         cookies.set("userId", this.state.email);
         cookies.set(
           "password",
@@ -72,27 +64,22 @@ class Login extends Component {
           "x-access-token",
           this.getEncryptedValue(result.data.values[0].token, "#")
         );
-        this.setState({ userAuthorized: true });
+
         this.props.history.push({
           pathname: "/admin",
           user: this.state.email,
-          data: this.state.loginResponse,
+          data: result.data.values[0],
         });
       } else {
-        this.setState({ response_status: "danger" });
-        if (
-          lodash.includes(STATUS_LIST_TO_SHOW_REASON, result.data.statusCode)
-        ) {
-          this.setState({ response_message: result.data.reasons[0] });
+        if (lodash.includes(STATUS_LIST_TO_SHOW_REASON, result.data.statusCode)) {
+          notificationMessage = result.data.reasons[0];
         } else {
           var status = result.data.status.split("_").join(" ");
-          this.setState({ response_message: status });
+          notificationMessage = status
         }
       }
-    }else {
-      this.setState({ response_status: "danger" });
-      this.setState({ response_message: "Server is not reachable" });
     }
+    this.showNotification(notificationType, notificationMessage);
   }
 
   OnLoginHit(event) {
@@ -172,31 +159,20 @@ class Login extends Component {
     this.setState({ login_component: loginComponent });
   }
 
+  showNotification(notificationType, message) {
+    pushNotification({
+      type: notificationType,
+      message: message,
+    });
+  }
+
   componentDidMount() {
     this.getLoginComponent();
   }
   render() {
     return (
       <>
-        <div className="auth-wrapper">{this.state.login_component}</div>
-        {this.state.ShowNotifications ? (
-          <Snackbar
-            color={this.state.response_status}
-            icon={
-              this.state.response_status === "success"
-                ? CheckCircleSharpIcon
-                : ErrorOutlineSharpIcon
-            }
-            message={this.state.response_message}
-            open={this.state.ShowNotifications}
-            closeNotification={() =>
-              this.setState({ ShowNotifications: false })
-            }
-            close
-          />
-        ) : (
-          ""
-        )}
+        <div className="auth-wrapper">{this.state.login_component} </div>
       </>
     );
   }

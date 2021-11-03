@@ -23,7 +23,7 @@ class SearchBox extends Component {
           placeholder="Search clients by their designation, email, name or phone no."
           name="query"
           onChange={this.onChange}
-          autoComplete={false}
+          autoComplete="off"
         />
       </div>
     );
