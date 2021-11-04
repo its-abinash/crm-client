@@ -10,10 +10,11 @@ import DeleteForeverIcon from "@material-ui/icons/DeleteForever";
 import AlertTitle from "@material-ui/lab/AlertTitle";
 import Button from "@material-ui/core/Button";
 import CircularProgress from "@material-ui/core/CircularProgress";
+import InfiniteScroll from "react-infinite-scroll-component";
 import {
   withStyles,
   ThemeProvider,
-  createMuiTheme,
+  createTheme,
 } from "@material-ui/core/styles";
 import { blue, green } from "@material-ui/core/colors";
 import { AES, enc } from "crypto-js";
@@ -22,6 +23,7 @@ import lodash from "lodash";
 import ChatModal from "../../components/chat.js";
 import Cookies from "universal-cookie";
 import spinner from "../../assets/loading.gif";
+import SpinnerIcon from 'react-bootstrap/Spinner'
 
 const LoadProfileCards = lazy(() => import("./profileCard"));
 const SearchBox = lazy(() => import("./searchBox"));
@@ -42,9 +44,6 @@ const divStyle = {
   flexDirection: "row",
   flexWrap: "wrap",
   alignContent: "flex-start",
-  scroll: "auto",
-  overflowX: "hidden",
-  overflowY: "auto",
   height: window.innerHeight,
 };
 
@@ -56,7 +55,7 @@ const loadingIconDiv = {
 
 const deleteBtnStyle = { backgroundColor: "red" };
 
-const ButtonTheme = createMuiTheme({
+const ButtonTheme = createTheme({
   palette: {
     primary: green,
     secondary: blue,
@@ -198,6 +197,9 @@ class TableList extends Component {
       email_body: "",
       loading: "false",
       isChecked: false,
+      hasMore: true,
+      offset: 0,
+      limit: 5,
     };
     this.DecryptKey = this.DecryptKey.bind(this);
     this.GetHeaders = this.GetHeaders.bind(this);
@@ -274,11 +276,11 @@ class TableList extends Component {
     this.setState({ is_admin: result.data.values[0] ? "true" : "false" });
   }
 
-  async ProcessAndGetUsers(searchText) {
+  async ProcessAndGetUsers(searchText = "") {
     await this.GetUserType();
     var userType = this.state.is_admin === "true" ? false : true;
     const qpArgs = this.getEncryptedValue(
-      `admin=${userType}&searchText=${searchText}`,
+      `admin=${userType}&searchText=${searchText}&limit=${this.state.limit}&offset=${this.state.offset}`,
       "#"
     );
     const URL = `http://localhost:3001/dashboard/users?${qpArgs}`;
@@ -294,11 +296,21 @@ class TableList extends Component {
       result = exc?.response;
     }
     if (result.data.statusCode === 401) {
-      this.showNotification("error", "You are not authorized to access this page");
+      this.showNotification(
+        "error",
+        "You are not authorized to access this page"
+      );
+      return;
+    }
+    if (lodash.isEmpty(result.data.values)) {
+      this.setState({ hasMore: false });
       return;
     }
     this.setState({
-      clients: result.data.values,
+      clients: !lodash.isEmpty(searchText)
+        ? result.data.values
+        : this.state.clients.concat(result.data.values),
+      offset: lodash.isEmpty(searchText) ? this.state.offset + this.state.limit: 0,
     });
   }
 
@@ -328,44 +340,13 @@ class TableList extends Component {
     }
   }
 
-  async GetUserData(searchText) {
+  async GetUserData(searchText = "") {
     await this.ProcessAndGetUsers(searchText);
-    var userData = this.state.clients;
-    const { classes } = this.props;
-    var users_list_component = userData.map((data) => {
-      return (
-        <Suspense fallback={<div>Loading...</div>} key={data.email}>
-          <LoadProfileCards
-            classes={classes}
-            data={data}
-            onClickChatBtn={() => {
-              this.setState({ ChatModalShow: true });
-              this.setState({ user_of_activated_modal: data.email });
-              this.setState({ username_of_activated_modal: data.name });
-              this.setState({ image_of_activated_modal: data.image });
-            }}
-            onClickEmailBtn={() => {
-              this.setState({ EmailModalShow: true });
-              this.setState({ user_of_activated_modal: data.email });
-              this.setState({ username_of_activated_modal: data.name });
-            }}
-            onClickDeleteBtn={() => {
-              this.setState({ DeleteModalShow: true });
-              this.setState({ user_of_activated_modal: data.email });
-              this.setState({ username_of_activated_modal: data.name });
-            }}
-          />
-        </Suspense>
-      );
-    });
-    this.setState({
-      users_component: users_list_component,
-      loading: "false",
-    });
+    this.setState({ loading: "false" });
   }
 
   componentDidMount() {
-    this.setState({ loading: "true" })
+    this.setState({ loading: "true" });
     this.GetUserData(""); // Empty searchText represents to get all users for the loggedInUser
   }
 
@@ -378,7 +359,7 @@ class TableList extends Component {
 
   render() {
     return (
-      <div>
+      <div style={{filter: "blur('8px')"}}>
         <Suspense fallback={<div>Loading...</div>}>
           <SearchBox
             callback={this}
@@ -390,40 +371,72 @@ class TableList extends Component {
             <img src={spinner} alt="loading..." />
           </div>
         )}
-        <div style={divStyle}>
-          {this.state.users_component}
-          <EmailModal
-            loadingicon={this.state.loading}
-            onSubmit={this.onEmailSubmit}
-            subject={this.state.email_subject}
-            body={this.state.email_body}
-            onChange={this.onChange}
-            user={this.state.user_of_activated_modal}
-            username={this.state.username_of_activated_modal}
-            show={this.state.EmailModalShow}
-            onHide={() => this.setState({ EmailModalShow: false })}
-          />
-          <ChatModal
-            user={this.state.user_of_activated_modal}
-            username={this.state.username_of_activated_modal}
-            logged_in_user={this.state.logged_in_user}
-            image={this.state.image_of_activated_modal}
-            show={this.state.ChatModalShow}
-            get_headers={this.GetHeaders}
-            get_encrypted_value={this.getEncryptedValue}
-            get_encrypted_payload={this.getEncryptedPayload}
-            get_decrypted_key={this.DecryptKey}
-            onHide={() => this.setState({ ChatModalShow: false })}
-          />
-          <DeleteModal
-            user={this.state.user_of_activated_modal}
-            username={this.state.username_of_activated_modal}
-            show={this.state.DeleteModalShow}
-            onChange={this.onChange}
-            isChecked={this.state.isChecked}
-            onHide={() => this.setState({ DeleteModalShow: false })}
-          />
-        </div>
+
+        <InfiniteScroll
+          dataLength={this.state.clients.length}
+          next={this.ProcessAndGetUsers}
+          hasMore={this.state.hasMore}
+          loader={<SpinnerIcon animation="border" />}
+          height={600}
+        >
+          <div style={divStyle}>
+            {this.state.clients.map((data) => (
+              <Suspense fallback={<div>Loading...</div>} key={data.email}>
+                <LoadProfileCards
+                  classes={this.props.classes}
+                  data={data}
+                  onClickChatBtn={() => {
+                    this.setState({ ChatModalShow: true });
+                    this.setState({ user_of_activated_modal: data.email });
+                    this.setState({ username_of_activated_modal: data.name });
+                    this.setState({ image_of_activated_modal: data.image });
+                  }}
+                  onClickEmailBtn={() => {
+                    this.setState({ EmailModalShow: true });
+                    this.setState({ user_of_activated_modal: data.email });
+                    this.setState({ username_of_activated_modal: data.name });
+                  }}
+                  onClickDeleteBtn={() => {
+                    this.setState({ DeleteModalShow: true });
+                    this.setState({ user_of_activated_modal: data.email });
+                    this.setState({ username_of_activated_modal: data.name });
+                  }}
+                />
+              </Suspense>
+            ))}
+            <EmailModal
+              loadingicon={this.state.loading}
+              onSubmit={this.onEmailSubmit}
+              subject={this.state.email_subject}
+              body={this.state.email_body}
+              onChange={this.onChange}
+              user={this.state.user_of_activated_modal}
+              username={this.state.username_of_activated_modal}
+              show={this.state.EmailModalShow}
+              onHide={() => this.setState({ EmailModalShow: false })}
+            />
+            <ChatModal
+              user={this.state.user_of_activated_modal}
+              username={this.state.username_of_activated_modal}
+              logged_in_user={this.state.logged_in_user}
+              image={this.state.image_of_activated_modal}
+              show={this.state.ChatModalShow}
+              get_headers={this.GetHeaders}
+              get_encrypted_value={this.getEncryptedValue}
+              get_encrypted_payload={this.getEncryptedPayload}
+              get_decrypted_key={this.DecryptKey}
+              onHide={() => this.setState({ ChatModalShow: false })}
+            />
+            <DeleteModal
+              user={this.state.user_of_activated_modal}
+              username={this.state.username_of_activated_modal}
+              show={this.state.DeleteModalShow}
+              onChange={this.onChange}
+              isChecked={this.state.isChecked}
+              onHide={() => this.setState({ DeleteModalShow: false })}
+            />
+          </div>
+        </InfiniteScroll>
       </div>
     );
   }
