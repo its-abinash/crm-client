@@ -8,14 +8,14 @@ import EmojiEmotionsIcon from "@material-ui/icons/EmojiEmotions";
 import IconButton from "@material-ui/core/IconButton";
 import Button from "@material-ui/core/Button";
 import PhotoCamera from "@material-ui/icons/PhotoCamera";
-import { ThemeProvider, createMuiTheme } from "@material-ui/core/styles";
+import { ThemeProvider, createTheme } from "@material-ui/core/styles";
 import { cyan } from "@material-ui/core/colors";
 import axios from "axios";
 import clientSocket from "socket.io-client";
 import lodash from "lodash";
 
 const LoadChat = lazy(() => import("./lazyLoadChat"));
-const ButtonTheme = createMuiTheme({
+const ButtonTheme = createTheme({
   palette: {
     primary: cyan,
   },
