@@ -1,17 +1,18 @@
-import { pushNotification } from "./Snackbar/toastUtils";
 import React, { Component } from "react";
 import "./index.css";
-import { AES } from "crypto-js";
-import axios from "axios";
 import Cookies from "universal-cookie";
 import lodash from "lodash";
+import {
+  RESTService,
+  encUtil,
+  NotificationUtil,
+} from "../main_utils/main_utils";
 const cookies = new Cookies();
-
-const STATUS_LIST_TO_SHOW_REASON = [400, 422];
 
 class Login extends Component {
   constructor(props) {
     super(props);
+    this._notificationUtil = null;
     this.state = {
       email: "",
       password: "",
@@ -27,59 +28,37 @@ class Login extends Component {
     this.setState({ [event.target.name]: event.target.value });
   }
 
-  getEncryptedValue(key, ENCRYPTION_KEY) {
-    var encrypted = "";
-    if (lodash.isObject(key)) {
-      encrypted = AES.encrypt(JSON.stringify(key), ENCRYPTION_KEY).toString();
-    } else {
-      encrypted = AES.encrypt(String(key), ENCRYPTION_KEY).toString();
-    }
-    return encrypted;
-  }
-
-  getEncryptedPayload = function (payload) {
-    payload = this.getEncryptedValue(payload, "#");
-    return payload;
-  };
-
   async processAndSendRequest(options) {
-    try {
-      var result = await axios(options);
-    } catch (exc) {
-      result = exc?.response;
-    }
-    var notificationType = "error";
-    var notificationMessage = "Server is not reachable";
-    if (result && result.data) {
-      if (result.data.statusCode === 200 && result.data.values[0].auth) {
-        notificationType = result.data.statusCode === 200 ? "success" : "error";
-        notificationMessage = result.data.reasons[0];
+    var result = await RESTService.makeRequest(options);
+    if (result.checkValidResponse()) {
+      var values = result.getValuesFromResponse();
+      var statusCode = result.getStatusCode();
+      if (statusCode === 200 && values[0].auth) {
         // Caching user data
         cookies.set("userId", this.state.email);
-        cookies.set(
-          "password",
-          this.getEncryptedValue(this.state.password, "#")
-        );
+        cookies.set("password", encUtil.getEncryptedValue(this.state.password));
         cookies.set(
           "x-access-token",
-          this.getEncryptedValue(result.data.values[0].token, "#")
+          encUtil.getEncryptedValue(values[0].token)
         );
 
         this.props.history.push({
           pathname: "/admin",
           user: this.state.email,
-          data: result.data.values[0],
+          data: values[0],
         });
-      } else {
-        if (lodash.includes(STATUS_LIST_TO_SHOW_REASON, result.data.statusCode)) {
-          notificationMessage = result.data.reasons[0];
-        } else {
-          var status = result.data.status.split("_").join(" ");
-          notificationMessage = status
-        }
       }
     }
-    this.showNotification(notificationType, notificationMessage);
+    var responseId = result.getResponseId();
+    var notificationType = result.getNotificationType();
+    var respId = lodash.isEmpty(responseId) ? "DEFAULT" : responseId;
+    var translateCodes = result.getTranslateCodes();
+    this._notificationUtil = new NotificationUtil(
+      notificationType,
+      respId,
+      translateCodes
+    );
+    this.showNotification();
   }
 
   OnLoginHit(event) {
@@ -89,7 +68,7 @@ class Login extends Component {
       email: email,
       password: password,
     };
-    var encryptedPayload = this.getEncryptedPayload(payload);
+    var encryptedPayload = encUtil.encryptPayload(payload);
     var finalPayload = { payload: encryptedPayload };
     var callOptions = {
       method: "POST",
@@ -159,11 +138,8 @@ class Login extends Component {
     this.setState({ login_component: loginComponent });
   }
 
-  showNotification(notificationType, message) {
-    pushNotification({
-      type: notificationType,
-      message: message,
-    });
+  showNotification() {
+    this._notificationUtil && this._notificationUtil.notify();
   }
 
   componentDidMount() {

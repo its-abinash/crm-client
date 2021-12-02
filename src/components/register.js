@@ -1,9 +1,10 @@
 import React, { Component } from "react";
-import { pushNotification } from "./Snackbar/toastUtils";
 import "./index.css";
-import lodash from "lodash";
-import { AES } from "crypto-js";
-import axios from "axios";
+import {
+  RESTService,
+  encUtil,
+  NotificationUtil,
+} from "../main_utils/main_utils";
 
 class SignUp extends Component {
   constructor(props) {
@@ -15,31 +16,15 @@ class SignUp extends Component {
       password: "",
       component: null,
     };
+    this._notificationUtil = null;
     this.onChange = this.onChange.bind(this);
     this.onSignUpHit = this.onSignUpHit.bind(this);
-    this.getEncryptedValue = this.getEncryptedValue.bind(this);
-    this.getEncryptedPayload = this.getEncryptedPayload.bind(this);
     this.showNotification = this.showNotification.bind(this);
   }
 
   onChange(event) {
     this.setState({ [event.target.name]: event.target.value });
   }
-
-  getEncryptedValue(key, ENCRYPTION_KEY) {
-    var encrypted = "";
-    if (lodash.isObject(key)) {
-      encrypted = AES.encrypt(JSON.stringify(key), ENCRYPTION_KEY).toString();
-    } else {
-      encrypted = AES.encrypt(String(key), ENCRYPTION_KEY).toString();
-    }
-    return encrypted;
-  }
-
-  getEncryptedPayload = function (payload) {
-    payload = this.getEncryptedValue(payload, "#");
-    return payload;
-  };
 
   async onSignUpHit(event) {
     event.preventDefault();
@@ -51,7 +36,7 @@ class SignUp extends Component {
       email: email,
       password: password,
     };
-    var encryptedPayload = this.getEncryptedPayload(payload);
+    var encryptedPayload = encUtil.encryptPayload(payload);
     var finalPayload = { payload: encryptedPayload };
     var callOptions = {
       method: "POST",
@@ -59,25 +44,13 @@ class SignUp extends Component {
       timeout: 60 * 1000,
       data: finalPayload,
     };
-
-    try {
-      var result = await axios(callOptions);
-    } catch (exc) {
-      result = exc?.response;
-    }
-    if (result && result.data) {
-      var statusCode = result.data.statusCode;
-      var message = result.data.reasons[0] || "Failed to register";
-      if (statusCode >= 200 && statusCode < 300) {
-        message = "Successfully Registered. Thank you for joining us!";
-      }
-      this.showNotification(
-        statusCode >= 200 && statusCode < 300 ? "success" : "danger",
-        message
-      );
-    } else {
-      this.showNotification("error", "Server is not reachable");
-    }
+    var result = await RESTService.makeRequest(callOptions);
+    this._notificationUtil = new NotificationUtil(
+      result.getNotificationType(),
+      result.getResponseId(),
+      result.getTranslateCodes()
+    );
+    this.showNotification();
   }
 
   getRegisterComponent() {
@@ -146,11 +119,8 @@ class SignUp extends Component {
     this.getRegisterComponent();
   }
 
-  showNotification(notificationType, message) {
-    pushNotification({
-      type: notificationType,
-      message: message,
-    });
+  showNotification() {
+    this._notificationUtil && this._notificationUtil.notify();
   }
 
   render() {

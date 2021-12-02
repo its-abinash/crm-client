@@ -10,9 +10,9 @@ import Button from "@material-ui/core/Button";
 import PhotoCamera from "@material-ui/icons/PhotoCamera";
 import { ThemeProvider, createTheme } from "@material-ui/core/styles";
 import { cyan } from "@material-ui/core/colors";
-import axios from "axios";
 import clientSocket from "socket.io-client";
 import lodash from "lodash";
+import {RESTService, encUtil} from "../main_utils/main_utils"
 
 const LoadChat = lazy(() => import("./lazyLoadChat"));
 const ButtonTheme = createTheme({
@@ -51,20 +51,9 @@ class ChatModal extends Component {
     this.socket = clientSocket(this.state.socketUrl);
     this.sendChat = this.sendChat.bind(this);
     this.onChange = this.onChange.bind(this);
-    this.makeRequest = this.makeRequest.bind(this);
     this.getPrevChatDataCallOptions =
       this.getPrevChatDataCallOptions.bind(this);
-    this.encryptKeyStable = this.encryptKeyStable.bind(this);
     this.loadChat = this.loadChat.bind(this);
-  }
-
-  async makeRequest(callOptions) {
-    try {
-      var result = await axios(callOptions);
-    } catch (exc) {
-      result = exc?.response;
-    }
-    return result;
   }
 
   sendChat(event) {
@@ -72,10 +61,10 @@ class ChatModal extends Component {
     document.getElementById("chat-input-id").value = "";
     var payload = {
       receiver: this.props.user,
-      chatmsg: this.props.get_encrypted_value(this.state.chat_message, "#"),
+      chatmsg: encUtil.getEncryptedValue(this.state.chat_message, "#"),
       timestamp: Date.now(),
     };
-    var encryptedPayload = this.props.get_encrypted_payload(payload);
+    var encryptedPayload = encUtil.getEncryptedValue(payload);
     var finalPayload = { payload: encryptedPayload };
     var callOptions = {
       method: "POST",
@@ -84,7 +73,7 @@ class ChatModal extends Component {
       timeout: 60 * 1000,
       data: finalPayload,
     };
-    this.makeRequest(callOptions);
+    RESTService.makeRequest(callOptions);
     this.setState({ chat_message: "" });
   }
 
@@ -92,16 +81,9 @@ class ChatModal extends Component {
     this.setState({ chat_message: event.target.value });
   }
 
-  encryptKeyStable(key) {
-    // This function encrypts key by ensuring that the encrypted key must remain same
-    // if the same key is encrypted again by this function
-    var encryptedKey = Buffer.from(String(key)).toString("base64");
-    return encryptedKey;
-  }
-
   getPrevChatDataCallOptions() {
-    var receiver = this.encryptKeyStable(this.props.user);
-    var sender = this.encryptKeyStable(this.props.logged_in_user);
+    var receiver = encUtil.encryptKeyStable(this.props.user);
+    var sender = encUtil.encryptKeyStable(this.props.logged_in_user);
     if (receiver === "" || sender === "") {
       return {};
     }
@@ -120,9 +102,9 @@ class ChatModal extends Component {
     if (lodash.isEmpty(callOptions)) {
       return;
     }
-    var result = await axios(callOptions);
+    var result = await RESTService.makeRequest(callOptions);
     var prev_received_msgs = this.state.received_msgs;
-    var curr_received_msgs = result.data.values;
+    var curr_received_msgs = result.getValuesFromResponse();
     var unionOfCommonReceivedMessages = lodash.uniqBy(
       [...prev_received_msgs, ...curr_received_msgs],
       "timestamp"
@@ -137,7 +119,7 @@ class ChatModal extends Component {
               userid={data.sender}
               loggedInUser={false}
               headers={this.props.get_headers()}
-              callback={this.makeRequest}
+              callback={RESTService.makeRequest}
             />
           )}
           {data.sender === this.props.logged_in_user &&
@@ -147,7 +129,7 @@ class ChatModal extends Component {
                 userid={data.sender}
                 loggedInUser={true}
                 headers={this.props.get_headers()}
-                callback={this.makeRequest}
+                callback={RESTService.makeRequest}
               />
             )}
         </Suspense>
@@ -161,7 +143,7 @@ class ChatModal extends Component {
     // DB, we get the same message back from server to "ChatSync" socket as an acknowledgement that, the message has successfully
     // been processed. Now, we render the same message in sender's div
     this.socket.on("ChatSync", (result) => {
-      result["chatmsg"] = this.props.get_decrypted_key(result["chatmsg"]);
+      result["chatmsg"] = encUtil.DecryptKey(result["chatmsg"]);
       this.setState({
         received_msgs: [result],
       });
