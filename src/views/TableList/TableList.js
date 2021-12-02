@@ -1,5 +1,4 @@
 import { lazy, Suspense } from "react";
-import { pushNotification } from "../../components/Snackbar/toastUtils";
 import Modal from "react-bootstrap/Modal";
 import Form from "react-bootstrap/Form";
 import Col from "react-bootstrap/Col";
@@ -17,13 +16,16 @@ import {
   createTheme,
 } from "@material-ui/core/styles";
 import { blue, green } from "@material-ui/core/colors";
-import { AES, enc } from "crypto-js";
-import axios from "axios";
 import lodash from "lodash";
 import ChatModal from "../../components/chat.js";
 import Cookies from "universal-cookie";
 import spinner from "../../assets/loading.gif";
-import SpinnerIcon from 'react-bootstrap/Spinner'
+import SpinnerIcon from "react-bootstrap/Spinner";
+import {
+  RESTService,
+  encUtil,
+  NotificationUtil,
+} from "../../main_utils/main_utils";
 
 const LoadProfileCards = lazy(() => import("./profileCard"));
 const SearchBox = lazy(() => import("./searchBox"));
@@ -181,6 +183,7 @@ function DeleteModal(props) {
 class TableList extends Component {
   constructor(props) {
     super(props);
+    this._notificationUtil = null;
     this.state = {
       is_admin: "",
       DeleteModalShow: false,
@@ -201,14 +204,11 @@ class TableList extends Component {
       offset: 0,
       limit: 5,
     };
-    this.DecryptKey = this.DecryptKey.bind(this);
     this.GetHeaders = this.GetHeaders.bind(this);
     this.ProcessAndGetUsers = this.ProcessAndGetUsers.bind(this);
     this.GetUserType = this.GetUserType.bind(this);
     this.onChange = this.onChange.bind(this);
     this.onEmailSubmit = this.onEmailSubmit.bind(this);
-    this.getEncryptedPayload = this.getEncryptedPayload.bind(this);
-    this.getEncryptedValue = this.getEncryptedValue.bind(this);
     this.showNotification = this.showNotification.bind(this);
   }
 
@@ -220,40 +220,14 @@ class TableList extends Component {
     }
   }
 
-  getEncryptedValue(key, ENCRYPTION_KEY) {
-    var encrypted = "";
-    if (lodash.isObject(key)) {
-      encrypted = AES.encrypt(JSON.stringify(key), ENCRYPTION_KEY).toString();
-    } else {
-      encrypted = AES.encrypt(String(key), ENCRYPTION_KEY).toString();
-    }
-    return encrypted;
-  }
-
-  getEncryptedPayload = function (payload) {
-    payload = this.getEncryptedValue(payload, "#");
-    return payload;
-  };
-
-  DecryptKey(key) {
-    var wordArray = AES.decrypt(key, "#");
-    var utf8String = wordArray.toString(enc.Utf8);
-    try {
-      var obj = JSON.parse(utf8String);
-      return obj;
-    } catch (exc) {
-      return utf8String || key;
-    }
-  }
-
   GetHeaders() {
     const token = cookies.get("x-access-token");
     if (!token) {
       return {};
     }
-    this.setState({ access_token: this.DecryptKey(token) });
+    this.setState({ access_token: encUtil.DecryptKey(token) });
     var headers = {
-      "x-access-token": this.DecryptKey(token),
+      "x-access-token": encUtil.DecryptKey(token),
     };
     return headers;
   }
@@ -268,18 +242,15 @@ class TableList extends Component {
       timeout: 60 * 1000,
       headers: this.GetHeaders(),
     };
-    try {
-      var result = await axios(options);
-    } catch (exc) {
-      result = exc?.response;
-    }
-    this.setState({ is_admin: result.data.values[0] ? "true" : "false" });
+    var result = await RESTService.makeRequest(options);
+    var values = result.getValuesFromResponse();
+    this.setState({ is_admin: values[0] ? "true" : "false" });
   }
 
   async ProcessAndGetUsers(searchText = "") {
     await this.GetUserType();
     var userType = this.state.is_admin === "true" ? false : true;
-    const qpArgs = this.getEncryptedValue(
+    const qpArgs = encUtil.getEncryptedValue(
       `admin=${userType}&searchText=${searchText}&limit=${this.state.limit}&offset=${this.state.offset}`,
       "#"
     );
@@ -290,27 +261,31 @@ class TableList extends Component {
       timeout: 60 * 1000,
       headers: this.GetHeaders(),
     };
-    try {
-      var result = await axios(options);
-    } catch (exc) {
-      result = exc?.response;
-    }
-    if (result.data.statusCode === 401) {
-      this.showNotification(
-        "error",
-        "You are not authorized to access this page"
+    var result = await RESTService.makeRequest(options);
+    var statusCode = result.getStatusCode();
+    var values = result.getValuesFromResponse();
+    var respId = result.getResponseId();
+    var translateCodes = result.getTranslateCodes();
+    if (statusCode === 401) {
+      this._notificationUtil = new NotificationUtil(
+        result.getNotificationType(),
+        respId,
+        translateCodes
       );
+      this.showNotification();
       return;
     }
-    if (lodash.isEmpty(result.data.values)) {
+    if (lodash.isEmpty(values)) {
       this.setState({ hasMore: false });
       return;
     }
     this.setState({
       clients: !lodash.isEmpty(searchText)
-        ? result.data.values
-        : this.state.clients.concat(result.data.values),
-      offset: lodash.isEmpty(searchText) ? this.state.offset + this.state.limit: 0,
+        ? values
+        : this.state.clients.concat(values),
+      offset: lodash.isEmpty(searchText)
+        ? this.state.offset + this.state.limit
+        : 0,
     });
   }
 
@@ -319,10 +294,10 @@ class TableList extends Component {
     const { user_of_activated_modal, email_body, email_subject } = this.state;
     var payload = {
       email: user_of_activated_modal,
-      subject: this.getEncryptedValue(email_subject, "#"),
-      body: this.getEncryptedValue(email_body, "#"),
+      subject: encUtil.getEncryptedValue(email_subject, "#"),
+      body: encUtil.getEncryptedValue(email_body, "#"),
     };
-    var encryptedPayload = this.getEncryptedPayload(payload);
+    var encryptedPayload = encUtil.encryptPayload(payload);
     var finalPayload = { payload: encryptedPayload };
     var callOptions = {
       method: "POST",
@@ -331,13 +306,13 @@ class TableList extends Component {
       timeout: 60 * 1000,
       data: finalPayload,
     };
-    try {
-      var result = await axios(callOptions);
-      this.showNotification("success", result.data.reasons[0]);
-    } catch (exc) {
-      result = exc?.response;
-      this.showNotification("error", result.data.reasons[0]);
-    }
+    var result = await RESTService.makeRequest(callOptions);
+    this._notificationUtil = new NotificationUtil(
+      result.getNotificationType(),
+      result.getResponseId(),
+      result.getTranslateCodes()
+    );
+    this.showNotification();
   }
 
   async GetUserData(searchText = "") {
@@ -350,16 +325,13 @@ class TableList extends Component {
     this.GetUserData(""); // Empty searchText represents to get all users for the loggedInUser
   }
 
-  showNotification(notificationType, message) {
-    pushNotification({
-      type: notificationType,
-      message: message,
-    });
+  showNotification() {
+    this._notificationUtil && this._notificationUtil.notify();
   }
 
   render() {
     return (
-      <div style={{filter: "blur('8px')"}}>
+      <div style={{ filter: "blur('8px')" }}>
         <Suspense fallback={<div>Loading...</div>}>
           <SearchBox
             callback={this}
@@ -422,9 +394,8 @@ class TableList extends Component {
               image={this.state.image_of_activated_modal}
               show={this.state.ChatModalShow}
               get_headers={this.GetHeaders}
-              get_encrypted_value={this.getEncryptedValue}
+              get_encrypted_value={encUtil.getEncryptedValue}
               get_encrypted_payload={this.getEncryptedPayload}
-              get_decrypted_key={this.DecryptKey}
               onHide={() => this.setState({ ChatModalShow: false })}
             />
             <DeleteModal

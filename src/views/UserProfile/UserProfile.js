@@ -1,5 +1,4 @@
 import React, { Component } from "react";
-import { pushNotification } from "../../components/Snackbar/toastUtils";
 import GridItem from "../../components/Grid/GridItem.js";
 import GridContainer from "../../components/Grid/GridContainer.js";
 import Card from "../../components/Card/Card.js";
@@ -17,12 +16,15 @@ import Slider from "@material-ui/core/Slider";
 import UpdateRoundedIcon from "@material-ui/icons/UpdateRounded";
 import { Col, Form, Row } from "react-bootstrap";
 import Cookies from "universal-cookie";
-import { AES, enc } from "crypto-js";
 import SelectDropdown from "../../hooks/select.js";
 import lodash from "lodash";
-import axios from "axios";
 import { REMAINDER_FREQUENCY_SLIDER_MARKS } from "../../constants/constants.js";
 import Avatar from "../../components/Avatar";
+import {
+  RESTService,
+  encUtil,
+  NotificationUtil,
+} from "../../main_utils/main_utils";
 
 var cardCategoryWhite = {
   color: "rgba(255,255,255,.62)",
@@ -79,18 +81,15 @@ class UserProfile extends Component {
       response_message: "",
       mouse_on_image: false,
     };
+    this._notificationUtil = null;
     this.inputRef = React.createRef();
     this.onChange = this.onChange.bind(this);
     this.onChangeDropdownValue = this.onChangeDropdownValue.bind(this);
     this.processAndSaveCookiesInState =
       this.processAndSaveCookiesInState.bind(this);
-    this.DecryptKey = this.DecryptKey.bind(this);
     this.verifyPasswordAndReport = this.verifyPasswordAndReport.bind(this);
     this.onSubmit = this.onSubmit.bind(this);
-    this.getEncryptedValue = this.getEncryptedValue.bind(this);
-    this.getEncryptedPayload = this.getEncryptedPayload.bind(this);
     this.GetHeaders = this.GetHeaders.bind(this);
-    this.makeRequest = this.makeRequest.bind(this);
     this.checkAndGetRequestType = this.checkAndGetRequestType.bind(this);
     this.buildPatchUrlFromPayload = this.buildPatchUrlFromPayload.bind(this);
     this.get_user_data = this.get_user_data.bind(this);
@@ -138,40 +137,16 @@ class UserProfile extends Component {
     this.setState({ countryCode: selectedOption.value });
   }
 
-  getEncryptedValue(key, ENCRYPTION_KEY) {
-    var encrypted = "";
-    if (lodash.isObject(key)) {
-      encrypted = AES.encrypt(JSON.stringify(key), ENCRYPTION_KEY).toString();
-    } else {
-      encrypted = AES.encrypt(String(key), ENCRYPTION_KEY).toString();
-    }
-    return encrypted;
-  }
-
-  getEncryptedPayload = function (payload) {
-    payload = this.getEncryptedValue(payload, "#");
-    return payload;
-  };
-
   GetHeaders() {
     const token = cookies.get("x-access-token");
     if (!token) {
       return {};
     }
-    this.setState({ access_token: this.DecryptKey(token) });
+    this.setState({ access_token: encUtil.DecryptKey(token) });
     var headers = {
-      "x-access-token": this.DecryptKey(token),
+      "x-access-token": encUtil.DecryptKey(token),
     };
     return headers;
-  }
-
-  async makeRequest(options) {
-    try {
-      var result = await axios(options);
-    } catch (exc) {
-      result = exc?.response;
-    }
-    return result;
   }
 
   verifyInputPropertiesAndReport() {
@@ -235,7 +210,7 @@ class UserProfile extends Component {
     }
     qpArgString = lodash.trimEnd(qpArgString);
     qpArgString = lodash.trimEnd(qpArgString, "&");
-    url = url + this.getEncryptedValue(qpArgString, "#");
+    url = url + encUtil.getEncryptedValue(qpArgString, "#");
     return url;
   }
 
@@ -255,7 +230,7 @@ class UserProfile extends Component {
     event.preventDefault();
     var allPropertiesValidated = this.verifyInputPropertiesAndReport();
     if (!allPropertiesValidated) {
-      this.showNotification("error", "Please enter valid information to update profile");
+      this.showNotification("error", "INVALID_DATA", []);
       return;
     }
     var profile = {};
@@ -296,13 +271,13 @@ class UserProfile extends Component {
         this.setState({ new_profile_picture_data: data });
         media["profile_picture"] = imageUri;
       } catch (exc) {
-        this.showNotification("error", "Not able to process selected image.\nPlease try to upload a valid image file.");
+        this.showNotification("error", "INVALID_IMG", []);
       }
     }
     var finalPayload = {},
       payload = {};
     if (lodash.isEmpty(profile) && lodash.isEmpty(media)) {
-      this.showNotification("warning", "Please enter data to update");
+      this.showNotification("warning", "EMPTY_DATA", []);
       return;
     } else if (lodash.isEmpty(profile)) {
       payload["email"] = email;
@@ -312,7 +287,7 @@ class UserProfile extends Component {
       payload["profile"] = profile;
     }
 
-    finalPayload = { payload: this.getEncryptedPayload(payload) };
+    finalPayload = { payload: encUtil.encryptPayload(payload) };
     var requestType = this.checkAndGetRequestType(payload);
     const options = {
       method: requestType,
@@ -324,23 +299,18 @@ class UserProfile extends Component {
       headers: this.GetHeaders(),
       data: finalPayload,
     };
-    var result = await this.makeRequest(options);
-    if (result && result.data) {
-      if (result.data.statusCode === 200) {
-        this.showNotification("success", result.data.reasons[0]);
-        await this.get_user_data();
-      } else {
-        if (lodash.includes([400, 500, 502], result.data.statusCode)) {
-          this.showNotification("error", result.data.reasons[0]);
-        }
-      }
-    } else {
-      this.showNotification("error", "Encountered error ocurred. Please try to reconnect to internet");
-    }
+    var result = await RESTService.makeRequest(options);
+    this._notificationUtil = new NotificationUtil(
+      result.getNotificationType(),
+      result.getResponseId(),
+      result.getTranslateCodes()
+    );
+    this.showNotification();
+    await this.get_user_data();
   }
 
   async deleteProfilePicture() {
-    var encryptedQpString = this.getEncryptedValue("image=null", "#");
+    var encryptedQpString = encUtil.getEncryptedValue("image=null", "#");
     const URL = `http://localhost:3001/user/${cookies.get(
       "userId"
     )}/?${encryptedQpString}`;
@@ -350,19 +320,13 @@ class UserProfile extends Component {
       timeout: 60 * 1000,
       headers: this.GetHeaders(),
     };
-    var result = await this.makeRequest(options);
-    if (result && result.data) {
-      if (result.data.statusCode === 200) {
-        this.showNotification("success", result.data.reasons[0]);
-        await this.get_user_data();
-      } else {
-        if (lodash.includes([400, 500, 502], result.data.statusCode)) {
-          this.showNotification("error", result.data.reasons[0]);
-        }
-      }
-    } else {
-      this.showNotification("error", "Encountered error ocurred. Please try to reconnect to internet");
-    }
+    var result = await RESTService.makeRequest(options);
+    this._notificationUtil = new NotificationUtil(
+      result.getNotificationType(),
+      result.getResponseId(),
+      result.getTranslateCodes()
+    );
+    this.showNotification();
   }
 
   verifyPasswordAndReport() {
@@ -371,21 +335,10 @@ class UserProfile extends Component {
     return result && result.input.length >= 8 ? true : false;
   }
 
-  DecryptKey(key) {
-    var wordArray = AES.decrypt(key, "#");
-    var utf8String = wordArray.toString(enc.Utf8);
-    try {
-      var obj = JSON.parse(utf8String);
-      return obj;
-    } catch (exc) {
-      return utf8String || key;
-    }
-  }
-
   processAndSaveCookiesInState() {
     var allCookies = cookies.getAll();
     var EncryptedPassword = allCookies["password"];
-    var DecryptedPassword = this.DecryptKey(EncryptedPassword);
+    var DecryptedPassword = encUtil.DecryptKey(EncryptedPassword);
     this.setState({
       email: allCookies["userId"],
       prev_password_from_db: DecryptedPassword,
@@ -400,8 +353,8 @@ class UserProfile extends Component {
       timeout: 60 * 1000,
       headers: this.GetHeaders(),
     };
-    var result = await this.makeRequest(options);
-    var values = result.data.values[0];
+    var result = await RESTService.makeRequest(options);
+    var values = result.getValuesFromResponse()[0];
     var profile_image = lodash.has(values, "media.image")
       ? values.media.image
       : null;
@@ -419,11 +372,8 @@ class UserProfile extends Component {
     this.get_user_data();
   }
 
-  showNotification(notificationType, message) {
-    pushNotification({
-      type: notificationType,
-      message: message,
-    });
+  showNotification(notificationType, message, translateCodes) {
+    this._notificationUtil && this._notificationUtil.notify();
   }
 
   render() {

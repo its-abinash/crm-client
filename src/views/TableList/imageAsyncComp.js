@@ -13,7 +13,7 @@ async function get_user_image(userId, headers, callback) {
     headers: headers,
   };
   var result = await callback(options);
-  var values = result.data.values[0];
+  var values = result.getValuesFromResponse[0];
   var profile_image = lodash.has(values, "media.image")
     ? values.media.image
     : null;

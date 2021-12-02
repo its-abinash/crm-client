@@ -14,13 +14,14 @@ import Card from "../../components/Card/Card.js";
 import CardHeader from "../../components/Card/CardHeader.js";
 import CardIcon from "../../components/Card/CardIcon.js";
 import CardFooter from "../../components/Card/CardFooter.js";
-import axios from "axios";
 import styles from "../../assets/jss/material-dashboard-react/views/dashboardStyle.js";
 import { Col, Row } from "react-bootstrap";
+import * as MainUtils from "../../main_utils/main_utils"
 
 const useStyles = makeStyles(styles);
 
 var getGitHubIssues = async function (type, server = true) {
+  const _RestUtil = new MainUtils.RestUtil();
   var URL = server
     ? "https://api.github.com/repos/AbinashB1997/CRM/issues"
     : "https://api.github.com/repos/AbinashB1997/crm-client/issues";
@@ -31,8 +32,8 @@ var getGitHubIssues = async function (type, server = true) {
     timeout: 60 * 1000,
     params: { state: type },
   };
-  var data = await axios(callOptions);
-  return data.data;
+  var data = await _RestUtil.makeRequest(callOptions);
+  return data.getRestData();
 };
 
 function GetIssueCount(props) {
