@@ -1,5 +1,17 @@
-import React, { Component } from "react";
-import "./index.css";
+import * as React from "react";
+import Avatar from "@mui/material/Avatar";
+import Button from "@mui/material/Button";
+import CssBaseline from "@mui/material/CssBaseline";
+import TextField from "@mui/material/TextField";
+import FormControlLabel from "@mui/material/FormControlLabel";
+import Checkbox from "@mui/material/Checkbox";
+import Link from "@mui/material/Link";
+import Grid from "@mui/material/Grid";
+import Box from "@mui/material/Box";
+import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
+import Typography from "@mui/material/Typography";
+import Container from "@mui/material/Container";
+import { createTheme, ThemeProvider } from "@mui/material/styles";
 import Cookies from "universal-cookie";
 import lodash from "lodash";
 import {
@@ -9,7 +21,9 @@ import {
 } from "../main_utils/main_utils";
 const cookies = new Cookies();
 
-class Login extends Component {
+const theme = createTheme();
+
+class SignIn extends React.Component {
   constructor(props) {
     super(props);
     this._notificationUtil = null;
@@ -18,9 +32,8 @@ class Login extends Component {
       password: "",
       login_component: null,
     };
-    this.OnLoginHit = this.OnLoginHit.bind(this);
+    this.handleSubmit = this.handleSubmit.bind(this);
     this.onChange = this.onChange.bind(this);
-    this.getLoginComponent = this.getLoginComponent.bind(this);
     this.showNotification = this.showNotification.bind(this);
   }
 
@@ -28,15 +41,34 @@ class Login extends Component {
     this.setState({ [event.target.name]: event.target.value });
   }
 
-  async processAndSendRequest(options) {
-    var result = await RESTService.makeRequest(options);
+  handleSubmit = async (event) => {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    var payload = {
+      email: data.get("email"),
+      password: data.get("password"),
+    };
+
+    var encryptedPayload = encUtil.encryptPayload(payload);
+    var finalPayload = { payload: encryptedPayload };
+    var callOptions = {
+      method: "POST",
+      url: "http://localhost:3001/login",
+      timeout: 60 * 1000,
+      data: finalPayload,
+    };
+
+    var result = await RESTService.makeRequest(callOptions);
     if (result.checkValidResponse()) {
       var values = result.getValuesFromResponse();
       var statusCode = result.getStatusCode();
       if (statusCode === 200 && values[0].auth) {
         // Caching user data
-        cookies.set("userId", this.state.email);
-        cookies.set("password", encUtil.getEncryptedValue(this.state.password));
+        cookies.set("userId", data.get("email"));
+        cookies.set(
+          "password",
+          encUtil.getEncryptedValue(data.get("password"))
+        );
         cookies.set(
           "x-access-token",
           encUtil.getEncryptedValue(values[0].token)
@@ -59,99 +91,85 @@ class Login extends Component {
       translateCodes
     );
     this.showNotification();
-  }
-
-  OnLoginHit(event) {
-    event.preventDefault();
-    const { email, password } = this.state;
-    var payload = {
-      email: email,
-      password: password,
-    };
-    var encryptedPayload = encUtil.encryptPayload(payload);
-    var finalPayload = { payload: encryptedPayload };
-    var callOptions = {
-      method: "POST",
-      url: "http://localhost:3001/login",
-      timeout: 60 * 1000,
-      data: finalPayload,
-    };
-    this.processAndSendRequest(callOptions);
-  }
-
-  getLoginComponent() {
-    var loginComponent = (
-      <div className="auth-inner">
-        <form onSubmit={this.OnLoginHit}>
-          <h3>Sign In</h3>
-          <div className="form-group">
-            <label>Email address</label>
-            <input
-              type="email"
-              name="email"
-              className="form-control"
-              placeholder="Enter email"
-              onChange={this.onChange}
-              autoComplete="off"
-              required
-            />
-          </div>
-
-          <div className="form-group">
-            <label>Password</label>
-            <input
-              type="password"
-              name="password"
-              className="form-control"
-              placeholder="Enter password"
-              onChange={this.onChange}
-              required
-            />
-          </div>
-
-          <div className="form-group">
-            <div className="custom-control custom-checkbox">
-              <input
-                type="checkbox"
-                className="custom-control-input"
-                id="customCheck1"
-              />
-              <label className="custom-control-label" htmlFor="customCheck1">
-                Remember me
-              </label>
-            </div>
-          </div>
-
-          <button type="submit" className="btn btn-primary btn-block">
-            Submit
-          </button>
-          <p className="have-account text-left">
-            Don't have an account?{" "}
-            <a href="http://localhost:3000/sign-up">create one</a>
-          </p>
-          <p className="forgot-password text-right">
-            Forgot <a href="http://localhost:3000">password?</a>
-          </p>
-        </form>
-      </div>
-    );
-    this.setState({ login_component: loginComponent });
-  }
+  };
 
   showNotification() {
     this._notificationUtil && this._notificationUtil.notify();
   }
 
-  componentDidMount() {
-    this.getLoginComponent();
-  }
   render() {
     return (
-      <>
-        <div className="auth-wrapper">{this.state.login_component} </div>
-      </>
+      <ThemeProvider theme={theme}>
+        <Container component="main" maxWidth="xs">
+          <CssBaseline />
+          <Box
+            sx={{
+              marginTop: 8,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+            }}
+          >
+            <Avatar sx={{ m: 1, bgcolor: "secondary.main" }}>
+              <LockOutlinedIcon />
+            </Avatar>
+            <Typography component="h1" variant="h5">
+              Sign in
+            </Typography>
+            <Box
+              component="form"
+              onSubmit={this.handleSubmit}
+              noValidate
+              sx={{ mt: 1 }}
+            >
+              <TextField
+                margin="normal"
+                required
+                fullWidth
+                id="email"
+                label="Email Address"
+                name="email"
+                autoFocus
+              />
+              <TextField
+                margin="normal"
+                required
+                fullWidth
+                name="password"
+                label="Password"
+                type="password"
+                id="password"
+              />
+              <FormControlLabel
+                control={<Checkbox value="remember" color="primary" />}
+                label="Remember me"
+              />
+              <Button
+                type="submit"
+                fullWidth
+                variant="contained"
+                sx={{ mt: 3, mb: 2 }}
+              >
+                Sign In
+              </Button>
+              <Grid container>
+                <Grid item xs>
+                  <Link href="#" variant="body2">
+                    Forgot password?
+                  </Link>
+                </Grid>
+                <Grid item>
+                  <Link href="http://localhost:3000/sign-up" variant="body2">
+                    {"Don't have an account? Signup now"}
+                  </Link>
+                </Grid>
+              </Grid>
+            </Box>
+          </Box>
+        </Container>
+      </ThemeProvider>
     );
   }
 }
 
-export default Login;
+export default SignIn;
