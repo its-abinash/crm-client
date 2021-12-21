@@ -16,6 +16,7 @@ const cardStyle = {
   marginBottom: "10px",
   borderRadius: "10%",
   borderColor: "orange",
+  zIndex: 2
 };
 
 const buttonStyle = {

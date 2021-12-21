@@ -9,7 +9,7 @@ export default function Loader(props) {
       sx={{ color: "#fff", zIndex: (theme) => theme.zIndex.drawer + 1 }}
       open={isOpen}
     >
-      <CircularProgress color="inherit" />
+      <CircularProgress color="inherit" size="4rem" />
     </Backdrop>
   );
 }

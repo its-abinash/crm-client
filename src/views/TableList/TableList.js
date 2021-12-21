@@ -245,9 +245,9 @@ class TableList extends Component {
     await this.GetUserType();
     var userType = this.state.is_admin === "true" ? false : true;
     var limit = this.state.limit;
-    var currentPageNumber = this.state.currentActivePage
+    var currentPageNumber = this.state.currentActivePage;
     var offset = lodash.isEmpty(searchText)
-      ? (limit * currentPageNumber) - (limit - 1)
+      ? limit * currentPageNumber - (limit - 1)
       : 0;
     const qpArgs = encUtil.getEncryptedValue(
       `admin=${userType}&searchText=${searchText}&limit=${this.state.limit}&offset=${offset}`,
@@ -324,85 +324,86 @@ class TableList extends Component {
 
   render() {
     return (
-      <div style={{ filter: "blur('8px')" }}>
-        <Suspense fallback={<div>Loading...</div>}>
-          <SearchBox
-            callback={this}
-            onChange={() => this.setState({ loading: "true" })}
-          />
-        </Suspense>
+      <>
         {this.state.loading === "true" && (
           <Loader isOpen={this.state.loading === "true"} />
         )}
-        <div style={divStyle}>
-          {this.state.clients.map((data) => (
-            <Suspense fallback={<div>Loading...</div>} key={data.email}>
-              <LoadProfileCards
-                classes={this.props.classes}
-                data={data}
-                onClickChatBtn={() => {
-                  this.setState({ ChatModalShow: true });
-                  this.setState({ user_of_activated_modal: data.email });
-                  this.setState({ username_of_activated_modal: data.name });
-                  this.setState({ image_of_activated_modal: data.image });
-                }}
-                onClickEmailBtn={() => {
-                  this.setState({ EmailModalShow: true });
-                  this.setState({ user_of_activated_modal: data.email });
-                  this.setState({ username_of_activated_modal: data.name });
-                }}
-                onClickDeleteBtn={() => {
-                  this.setState({ DeleteModalShow: true });
-                  this.setState({ user_of_activated_modal: data.email });
-                  this.setState({ username_of_activated_modal: data.name });
-                }}
-              />
-            </Suspense>
-          ))}
-          <EmailModal
-            loadingicon={this.state.loading}
-            onSubmit={this.onEmailSubmit}
-            subject={this.state.email_subject}
-            body={this.state.email_body}
-            onChange={this.onChange}
-            user={this.state.user_of_activated_modal}
-            username={this.state.username_of_activated_modal}
-            show={this.state.EmailModalShow}
-            onHide={() => this.setState({ EmailModalShow: false })}
-          />
-          <ChatModal
-            user={this.state.user_of_activated_modal}
-            username={this.state.username_of_activated_modal}
-            logged_in_user={this.state.logged_in_user}
-            image={this.state.image_of_activated_modal}
-            show={this.state.ChatModalShow}
-            get_headers={this.GetHeaders}
-            get_encrypted_value={encUtil.getEncryptedValue}
-            get_encrypted_payload={this.getEncryptedPayload}
-            onHide={() => this.setState({ ChatModalShow: false })}
-          />
-          <DeleteModal
-            user={this.state.user_of_activated_modal}
-            username={this.state.username_of_activated_modal}
-            show={this.state.DeleteModalShow}
-            onChange={this.onChange}
-            isChecked={this.state.isChecked}
-            onHide={() => this.setState({ DeleteModalShow: false })}
-          />
+        <div style={{ filter: "blur('8px')" }}>
+          <Suspense fallback={<div>Loading...</div>}>
+            <SearchBox
+              callback={this}
+              onChange={() => this.setState({ loading: "true" })}
+            />
+          </Suspense>
+          <div style={divStyle}>
+            {this.state.clients.map((data) => (
+              <Suspense fallback={<div>Loading...</div>} key={data.email}>
+                <LoadProfileCards
+                  classes={this.props.classes}
+                  data={data}
+                  onClickChatBtn={() => {
+                    this.setState({ ChatModalShow: true });
+                    this.setState({ user_of_activated_modal: data.email });
+                    this.setState({ username_of_activated_modal: data.name });
+                    this.setState({ image_of_activated_modal: data.image });
+                  }}
+                  onClickEmailBtn={() => {
+                    this.setState({ EmailModalShow: true });
+                    this.setState({ user_of_activated_modal: data.email });
+                    this.setState({ username_of_activated_modal: data.name });
+                  }}
+                  onClickDeleteBtn={() => {
+                    this.setState({ DeleteModalShow: true });
+                    this.setState({ user_of_activated_modal: data.email });
+                    this.setState({ username_of_activated_modal: data.name });
+                  }}
+                />
+              </Suspense>
+            ))}
+            <EmailModal
+              loadingicon={this.state.loading}
+              onSubmit={this.onEmailSubmit}
+              subject={this.state.email_subject}
+              body={this.state.email_body}
+              onChange={this.onChange}
+              user={this.state.user_of_activated_modal}
+              username={this.state.username_of_activated_modal}
+              show={this.state.EmailModalShow}
+              onHide={() => this.setState({ EmailModalShow: false })}
+            />
+            <ChatModal
+              user={this.state.user_of_activated_modal}
+              username={this.state.username_of_activated_modal}
+              logged_in_user={this.state.logged_in_user}
+              image={this.state.image_of_activated_modal}
+              show={this.state.ChatModalShow}
+              get_headers={this.GetHeaders}
+              get_encrypted_value={encUtil.getEncryptedValue}
+              get_encrypted_payload={this.getEncryptedPayload}
+              onHide={() => this.setState({ ChatModalShow: false })}
+            />
+            <DeleteModal
+              user={this.state.user_of_activated_modal}
+              username={this.state.username_of_activated_modal}
+              show={this.state.DeleteModalShow}
+              onChange={this.onChange}
+              isChecked={this.state.isChecked}
+              onHide={() => this.setState({ DeleteModalShow: false })}
+            />
+          </div>
+          <div style={{ marginLeft: "70%", marginTop: "10%" }}>
+            <Pagination
+              count={this.state.totalPages}
+              defaultPage={1}
+              color="secondary"
+              onChange={async (event, currentPageNumber) => {
+                this.setState({ currentActivePage: currentPageNumber });
+                await this.ProcessAndGetUsers();
+              }}
+            />
+          </div>
         </div>
-        <div style={{ marginLeft: "70%", marginTop: "10%" }}>
-          <Pagination
-            count={this.state.totalPages}
-            defaultPage={1}
-            color="secondary"
-            onChange={async (event, currentPageNumber) => {
-              this.setState({currentActivePage: currentPageNumber})
-              await this.ProcessAndGetUsers();
-            }
-          }
-          />
-        </div>
-      </div>
+      </>
     );
   }
 }

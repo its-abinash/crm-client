@@ -8,6 +8,9 @@ import lodash from "lodash";
 import axios from "axios";
 import { AES, enc } from "crypto-js";
 import "format-unicorn";
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+import { getFirestore } from "firebase/firestore";
 
 class MainUtils {}
 
@@ -43,11 +46,19 @@ class Util extends MainUtils {
 }
 
 class ResponseUtil {
+  #default_resp = {
+    data: null,
+    reasons: null,
+    statusCode: 404,
+    values: null,
+    responseId: null,
+    translateCodes: [],
+  };
   constructor(resp) {
     this._response = resp;
   }
   getRestData() {
-    return this._response.data;
+    return this._response ? this._response.data : this.#default_resp;
   }
   checkValidResponse() {
     return this._response && this.getRestData();
@@ -136,10 +147,40 @@ class RestUtil extends EncryptionUtil {
   }
 }
 
+class firebase {
+  #firebase_configuration = {
+    apiKey: "AIzaSyDlO4qyATWgt93_AzZlmXNzNp--KOzFxfU",
+    authDomain: "crm-app-4a1bf.firebaseapp.com",
+    projectId: "crm-app-4a1bf",
+    storageBucket: "crm-app-4a1bf.appspot.com",
+    messagingSenderId: "285116286508",
+    appId: "1:285116286508:web:f7c1267e6284d3861c7389",
+    measurementId: "G-DN5SYJH2P2",
+  };
+  #fireapp;
+  #fireanalytics;
+  #firestoredb;
+  constructor() {
+    this.#fireapp = initializeApp(this.#firebase_configuration);
+    this.#fireanalytics = getAnalytics(this.#fireapp);
+    this.#firestoredb = getFirestore();
+  }
+  getFireApp() {
+    return this.#fireapp;
+  }
+  getFireAnalytics() {
+    return this.#fireanalytics;
+  }
+  getFireDB() {
+    return this.#firestoredb;
+  }
+}
+
 // Instances
 const util = new Util();
 const encUtil = new EncryptionUtil();
 const RESTService = new RestUtil();
+const fire = new firebase();
 
 export {
   RestUtil,
@@ -149,4 +190,5 @@ export {
   util,
   encUtil,
   RESTService,
+  fire
 };

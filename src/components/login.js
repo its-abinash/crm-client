@@ -59,6 +59,10 @@ class SignIn extends React.Component {
     };
 
     var result = await RESTService.makeRequest(callOptions);
+    if(!result) {
+      this._notificationUtil = new NotificationUtil("error", "DEFAULT");
+      return;
+    }
     if (result.checkValidResponse()) {
       var values = result.getValuesFromResponse();
       var statusCode = result.getStatusCode();
